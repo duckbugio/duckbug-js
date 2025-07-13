@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig",
+  "compilerOptions": {
+    "target": "ES2024",
+    "outDir": "dist/esm",
+    "module": "ES2020"
+  }
+}

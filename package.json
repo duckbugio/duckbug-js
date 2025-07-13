@@ -3,9 +3,10 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "lib/index.js",
+  "main": "build/cjs/index.js",
+  "module": "build/esm/index.js",
   "scripts": {
-    "compile": "yarn tsc -d",
+    "compile": "yarn tsc -d -p tsconfig.cjs.json && yarn tsc -d -p tsconfig.esm.json",
     "lint": "yarn biome ci",
     "prepare": "husky"
   },
