@@ -105,6 +105,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@duckbug/js@workspace:.":
+  version: 0.0.0-use.local
+  resolution: "@duckbug/js@workspace:."
+  dependencies:
+    "@biomejs/biome": ^2.1.1
+    husky: ^9.1.7
+    pinst: ^3.0.0
+    ts-node: ^10.9.2
+    typescript: ^5.8.3
+  languageName: unknown
+  linkType: soft
+
 "@jridgewell/resolve-uri@npm:^3.0.3":
   version: 3.1.2
   resolution: "@jridgewell/resolve-uri@npm:3.1.2"
@@ -196,20 +208,28 @@ __metadata:
   languageName: node
   linkType: hard
 
-"fbug-core@workspace:.":
-  version: 0.0.0-use.local
-  resolution: "fbug-core@workspace:."
-  dependencies:
-    "@biomejs/biome": ^2.1.1
-    ts-node: ^10.9.2
-    typescript: ^5.8.3
-  languageName: unknown
-  linkType: soft
+"husky@npm:^9.1.7":
+  version: 9.1.7
+  resolution: "husky@npm:9.1.7"
+  bin:
+    husky: bin.js
+  checksum: c2412753f15695db369634ba70f50f5c0b7e5cb13b673d0826c411ec1bd9ddef08c1dad89ea154f57da2521d2605bd64308af748749b27d08c5f563bcd89975f
+  languageName: node
+  linkType: hard
 
 "make-error@npm:^1.1.1":
   version: 1.3.6
   resolution: "make-error@npm:1.3.6"
   checksum: b86e5e0e25f7f777b77fabd8e2cbf15737972869d852a22b7e73c17623928fccb826d8e46b9951501d3f20e51ad74ba8c59ed584f610526a48f8ccf88aaec402
+  languageName: node
+  linkType: hard
+
+"pinst@npm:^3.0.0":
+  version: 3.0.0
+  resolution: "pinst@npm:3.0.0"
+  bin:
+    pinst: bin.js
+  checksum: 4ae48a6a60f79c37071233af51b4d91bfc85cfa3c12b66ccda60cdb642b4d14a4ab0cb3587afc55b1f6192cea1772a5e4822026a0d0d3528296edef00cc2d61f
   languageName: node
   linkType: hard
 

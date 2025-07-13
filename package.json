@@ -6,10 +6,13 @@
   "main": "lib/index.js",
   "scripts": {
     "compile": "yarn tsc -d",
-    "lint": "yarn biome ci"
+    "lint": "yarn biome ci",
+    "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
+    "husky": "^9.1.7",
+    "pinst": "^3.0.0",
     "ts-node": "^10.9.2",
     "typescript": "^5.8.3"
   },

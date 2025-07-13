@@ -3,33 +3,33 @@ import { LogProvider, logLevel } from "../Log";
 import type { Provider } from "../Provider";
 
 export class DuckSDK {
-	#providers;
+  #providers;
 
-	constructor(
-		providers: Array<Provider>,
-		logProviderConfig?: LogProviderConfig,
-	) {
-		this.#providers = providers;
-		new LogProvider(providers, logProviderConfig);
-	}
+  constructor(
+    providers: Array<Provider>,
+    logProviderConfig?: LogProviderConfig,
+  ) {
+    this.#providers = providers;
+    new LogProvider(providers, logProviderConfig);
+  }
 
-	log(tag: string, payload?: object) {
-		this.#sendReportToPlugins(tag, logLevel.DEBUG, payload);
-	}
+  log(tag: string, payload?: object) {
+    this.#sendReportToPlugins(tag, logLevel.DEBUG, payload);
+  }
 
-	error(tag: string, payload?: object) {
-		this.#sendReportToPlugins(tag, logLevel.DEBUG, payload);
-	}
+  error(tag: string, payload?: object) {
+    this.#sendReportToPlugins(tag, logLevel.DEBUG, payload);
+  }
 
-	debug(tag: string, payload?: object) {
-		this.#sendReportToPlugins(tag, logLevel.DEBUG, payload);
-	}
+  debug(tag: string, payload?: object) {
+    this.#sendReportToPlugins(tag, logLevel.DEBUG, payload);
+  }
 
-	warn(tag: string, payload?: object) {
-		this.#sendReportToPlugins(tag, logLevel.WARN, payload);
-	}
+  warn(tag: string, payload?: object) {
+    this.#sendReportToPlugins(tag, logLevel.WARN, payload);
+  }
 
-	#sendReportToPlugins(tag: string, level: LogLevel, payload?: object) {
-		this.#providers.forEach((plugin) => plugin.report(tag, level, payload));
-	}
+  #sendReportToPlugins(tag: string, level: LogLevel, payload?: object) {
+    this.#providers.forEach((plugin) => plugin.report(tag, level, payload));
+  }
 }
