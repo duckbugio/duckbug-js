@@ -1,0 +1,17 @@
+{
+  "name": "@duckbug/js",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "lib/index.js",
+  "scripts": {
+    "compile": "yarn tsc -d",
+    "lint": "yarn biome ci"
+  },
+  "devDependencies": {
+    "@biomejs/biome": "^2.1.1",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.8.3"
+  },
+  "packageManager": "yarn@3.8.7"
+}
