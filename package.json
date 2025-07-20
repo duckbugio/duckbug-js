@@ -1,21 +1,34 @@
 {
   "name": "@duckbug/js",
   "version": "0.1.0",
-  "private": false,
   "type": "module",
-  "main": "dist/cjs/index.js",
-  "module": "dist/esm/index.js",
+  "main": "./dist/cjs/index.cjs",
+  "module": "./dist/esm/index.js",
+  "types": "./dist/types/index.d.ts",
+  "exports": {
+    ".": {
+      "require": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/cjs/index.cjs"
+      },
+      "import": {
+        "types": "./dist/types/index.d.ts",
+        "default": "./dist/esm/index.js"
+      }
+    }
+  },
   "files": [
     "dist",
     "README.md"
   ],
   "scripts": {
-    "compile": "yarn tsc -d -p tsconfig.cjs.json && yarn tsc -d -p tsconfig.esm.json",
+    "build": "rslib build",
     "lint": "yarn biome ci",
     "prepare": "husky"
   },
   "devDependencies": {
     "@biomejs/biome": "^2.1.1",
+    "@rslib/core": "^0.10.6",
     "husky": "^9.1.7",
     "pinst": "^3.0.0",
     "ts-node": "^10.9.2",

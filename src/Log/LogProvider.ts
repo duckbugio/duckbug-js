@@ -2,13 +2,13 @@ import type { Provider } from "../Provider";
 import type { LogProviderConfig } from "./LogProviderConfig";
 
 export class LogProvider {
-  #originalConsole = {
+  private originalConsole = {
     log: console.log,
     error: console.error,
     warn: console.warn,
   };
-  #plugins: Array<Provider>;
-  #logProviderConfig: LogProviderConfig = {
+  private providers: Array<Provider>;
+  private logProviderConfig: LogProviderConfig = {
     logReports: {
       log: false,
       warn: true,
@@ -17,58 +17,58 @@ export class LogProvider {
   };
 
   constructor(
-    plugins: Array<Provider>,
-    logProviderConfig: LogProviderConfig = this.#logProviderConfig,
+    providers: Array<Provider>,
+    logProviderConfig: LogProviderConfig = this.logProviderConfig,
   ) {
-    this.#logProviderConfig = logProviderConfig;
-    this.#plugins = plugins;
-    this.#initialize();
+    this.logProviderConfig = logProviderConfig;
+    this.providers = providers;
+    this.initialize();
   }
 
-  #initialize() {
-    if (this.#logProviderConfig.logReports.log) {
-      this.#overrideLog();
+  initialize() {
+    if (this.logProviderConfig.logReports.log) {
+      this.overrideLog();
     }
-    if (this.#logProviderConfig.logReports.warn) {
-      this.#overrideWarn();
+    if (this.logProviderConfig.logReports.warn) {
+      this.overrideWarn();
     }
-    if (this.#logProviderConfig.logReports.error) {
-      this.#overrideError();
+    if (this.logProviderConfig.logReports.error) {
+      this.overrideError();
     }
   }
 
-  #overrideError() {
+  private overrideError() {
     console.error = (...args: unknown[]) => {
-      this.#originalConsole.error.apply(console, args);
+      this.originalConsole.error.apply(console, args);
 
-      this.#callPlugins((plugin) => {
+      this.callPlugins((plugin) => {
         plugin.error(args);
       });
     };
   }
 
-  #overrideLog() {
+  private overrideLog() {
     console.log = (...args: unknown[]) => {
-      this.#originalConsole.log.apply(console, args);
+      this.originalConsole.log.apply(console, args);
 
-      this.#callPlugins((plugin) => {
+      this.callPlugins((plugin) => {
         plugin.log(args);
       });
     };
   }
 
-  #overrideWarn() {
+  private overrideWarn() {
     console.warn = (...args: unknown[]) => {
-      this.#originalConsole.warn.apply(console, args);
+      this.originalConsole.warn.apply(console, args);
 
-      this.#callPlugins((plugin) => {
+      this.callPlugins((plugin) => {
         plugin.warn(args);
       });
     };
   }
 
-  #callPlugins(callback: (plugin: Provider) => void) {
-    this.#plugins.forEach((plugin) => {
+  private callPlugins(callback: (plugin: Provider) => void) {
+    this.providers.forEach((plugin) => {
       callback(plugin);
     });
   }
