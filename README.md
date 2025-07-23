@@ -141,8 +141,13 @@ class TelegramProvider implements Provider {
   }
 
   report(tag: string, level: LogLevel, payload?: object): void {
-    const emoji = level === 'ERROR' ? '🚨' : level === 'WARN' ? '⚠️' : '📝';
-    this.sendToTelegram(emoji, [tag, payload]);
+    const emojiMap: Record<LogLevel, string> = {
+      INFO: '📝',
+      DEBUG: '🦆',
+      WARN: '⚠️',
+      ERROR: '🚨',
+    };
+    this.sendToTelegram(emojiMap[level], [tag, payload]);
   }
 
   private sendToTelegram(emoji: string, args: unknown[]) {
