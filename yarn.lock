@@ -104,7 +104,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@biomejs/biome@npm:^2.1.1":
+"@biomejs/biome@npm:2.1.1":
   version: 2.1.1
   resolution: "@biomejs/biome@npm:2.1.1"
   dependencies:
@@ -208,12 +208,12 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "@duckbug/js@workspace:."
   dependencies:
-    "@biomejs/biome": ^2.1.1
-    "@rslib/core": ^0.10.6
-    husky: ^9.1.7
-    pinst: ^3.0.0
-    ts-node: ^10.9.2
-    typescript: ^5.8.3
+    "@biomejs/biome": 2.1.1
+    "@rslib/core": 0.10.6
+    husky: 9.1.7
+    pinst: 3.0.0
+    ts-node: 10.9.2
+    typescript: 5.8.3
   languageName: unknown
   linkType: soft
 
@@ -357,7 +357,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@rslib/core@npm:^0.10.6":
+"@rslib/core@npm:0.10.6":
   version: 0.10.6
   resolution: "@rslib/core@npm:0.10.6"
   dependencies:
@@ -616,7 +616,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"husky@npm:^9.1.7":
+"husky@npm:9.1.7":
   version: 9.1.7
   resolution: "husky@npm:9.1.7"
   bin:
@@ -680,7 +680,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"pinst@npm:^3.0.0":
+"pinst@npm:3.0.0":
   version: 3.0.0
   resolution: "pinst@npm:3.0.0"
   bin:
@@ -728,7 +728,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ts-node@npm:^10.9.2":
+"ts-node@npm:10.9.2":
   version: 10.9.2
   resolution: "ts-node@npm:10.9.2"
   dependencies:
@@ -784,7 +784,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@npm:^5.8.3":
+"typescript@npm:5.8.3":
   version: 5.8.3
   resolution: "typescript@npm:5.8.3"
   bin:
@@ -794,7 +794,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"typescript@patch:typescript@^5.8.3#~builtin<compat/typescript>":
+"typescript@patch:typescript@5.8.3#~builtin<compat/typescript>":
   version: 5.8.3
   resolution: "typescript@patch:typescript@npm%3A5.8.3#~builtin<compat/typescript>::version=5.8.3&hash=5786d5"
   bin:

@@ -27,12 +27,12 @@
     "prepare": "husky"
   },
   "devDependencies": {
-    "@biomejs/biome": "^2.1.1",
-    "@rslib/core": "^0.10.6",
-    "husky": "^9.1.7",
-    "pinst": "^3.0.0",
-    "ts-node": "^10.9.2",
-    "typescript": "^5.8.3"
+    "@biomejs/biome": "2.1.1",
+    "@rslib/core": "0.10.6",
+    "husky": "9.1.7",
+    "pinst": "3.0.0",
+    "ts-node": "10.9.2",
+    "typescript": "5.8.3"
   },
   "packageManager": "yarn@3.8.7"
 }
