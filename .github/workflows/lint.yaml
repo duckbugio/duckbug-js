@@ -1,0 +1,24 @@
+name: Lint duckbug-js SDK
+on:
+  pull_request:
+    branches:
+      - main
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: ".nvmrc"
+
+      - name: Install Yarn 3.8.7
+        run: |
+          corepack enable
+          yarn set version 3.8.7 --only-if-needed
+          yarn install
+
+      - run: yarn lint
