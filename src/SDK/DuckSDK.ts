@@ -29,6 +29,10 @@ export class DuckSDK {
     this.sendReportToPlugins(tag, logLevel.WARN, payload);
   }
 
+  fatal(tag: string, payload?: object) {
+    this.sendReportToPlugins(tag, logLevel.FATAL, payload);
+  }
+
   private sendReportToPlugins(tag: string, level: LogLevel, payload?: object) {
     this.providers.forEach((plugin) => plugin.report(tag, level, payload));
   }
