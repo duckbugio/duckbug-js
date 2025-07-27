@@ -1,16 +1,16 @@
-import type { Log, LogLevel } from "../Log";
-import { logLevel } from "../Log";
-import type { Provider } from "../Provider";
-import type { DuckConfig } from "../SDK";
+import { type LogLevel, logLevel, type Provider } from "../SDK";
+import type { DuckBugConfig } from "./DuckBugConfig";
+import { DuckBugService } from "./DuckBugService";
 
 export class DuckBugProvider implements Provider {
-  config: DuckConfig;
-  constructor(config: DuckConfig) {
-    this.config = config;
+  service: DuckBugService;
+
+  constructor(config: DuckBugConfig) {
+    this.service = new DuckBugService(config);
   }
 
   warn(...args: unknown[]): void {
-    this.sendLog({
+    this.service.sendLog({
       time: this.getTimeStamp(),
       level: logLevel.WARN,
       message: this.convertArgsToString(args[0]),
@@ -19,7 +19,7 @@ export class DuckBugProvider implements Provider {
   }
 
   error(...args: unknown[]): void {
-    this.sendLog({
+    this.service.sendLog({
       time: this.getTimeStamp(),
       level: logLevel.ERROR,
       message: this.convertArgsToString(args[0]),
@@ -28,7 +28,7 @@ export class DuckBugProvider implements Provider {
   }
 
   log(...args: unknown[]): void {
-    this.sendLog({
+    this.service.sendLog({
       time: this.getTimeStamp(),
       level: logLevel.INFO,
       message: this.convertArgsToString(args[0]),
@@ -37,11 +37,19 @@ export class DuckBugProvider implements Provider {
   }
 
   report(tag: string, level: LogLevel, payload?: object): void {
-    this.sendLog({
+    this.service.sendLog({
       time: this.getTimeStamp(),
       level,
       message: tag,
       context: JSON.stringify(payload),
+    });
+  }
+
+  quack(tag: string, error: Error): void {
+    this.service.sendError({
+      stack: error.stack,
+      message: tag,
+      context: error.message,
     });
   }
 
@@ -55,15 +63,5 @@ export class DuckBugProvider implements Provider {
 
   private getTimeStamp(): number {
     return Date.now();
-  }
-
-  private sendLog(logInfo: Log) {
-    fetch(`${this.config.dsn}/logs`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(logInfo),
-    });
   }
 }

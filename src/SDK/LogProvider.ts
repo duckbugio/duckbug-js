@@ -1,5 +1,5 @@
-import type { Provider } from "../Provider";
 import type { LogProviderConfig } from "./LogProviderConfig";
+import type { Provider } from "./Provider";
 
 export class LogProvider {
   private originalConsole = {

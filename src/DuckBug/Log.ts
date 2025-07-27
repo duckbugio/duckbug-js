@@ -1,4 +1,4 @@
-import type { LogLevel } from "./LogLevel";
+import type { LogLevel } from "../SDK/LogLevel";
 
 export type Log = {
   message: string;
