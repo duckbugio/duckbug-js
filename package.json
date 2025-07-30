@@ -24,7 +24,8 @@
   "scripts": {
     "build": "rslib build",
     "lint": "yarn biome ci",
-    "prepare": "husky"
+    "prepare": "husky",
+    "test": "vitest run"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.1",
@@ -32,7 +33,8 @@
     "husky": "9.1.7",
     "pinst": "3.0.0",
     "ts-node": "10.9.2",
-    "typescript": "5.8.3"
+    "typescript": "5.8.3",
+    "vitest": "^3.2.4"
   },
   "packageManager": "yarn@3.8.7"
 }

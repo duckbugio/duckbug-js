@@ -18,9 +18,11 @@ export class LogProvider {
 
   constructor(
     providers: Array<Provider>,
-    logProviderConfig: LogProviderConfig = this.logProviderConfig,
+    logProviderConfig?: LogProviderConfig,
   ) {
-    this.logProviderConfig = logProviderConfig;
+    if (logProviderConfig) {
+      this.logProviderConfig = logProviderConfig;
+    }
     this.providers = providers;
     this.initialize();
   }
