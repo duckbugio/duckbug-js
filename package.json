@@ -25,7 +25,8 @@
     "build": "rslib build",
     "lint": "yarn biome ci",
     "prepare": "husky",
-    "test": "vitest run"
+    "test": "vitest run",
+    "publish": "yarn build && yarn npm publish"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.1",
