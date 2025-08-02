@@ -55,21 +55,15 @@ duck.log('Info message', { userId: 123, action: 'user_login' });
 duck.debug('Debug message', { debugInfo: 'Connection established' });
 duck.warn('Warning message', { warning: 'Rate limit approaching' });
 duck.error('Error message', { error: 'Database connection failed' });
-```
+duck.fatal('Fatal message', { error: 'Ay, caramba' });
 
-### JavaScript Usage
+//Send error
+const testError = new Error("Integration test error");
+testError.stack =
+  "Error: Integration test error\n    at integration.test.ts:1:1";
 
-```javascript
-const { DuckSDK, DuckBugProvider } = require('@duckbug/js');
-
-const providers = [
-  new DuckBugProvider({
-    dsn: 'your-duckbug-dsn-here'
-  })
-];
-
-const duck = new DuckSDK(providers);
-duck.error('Something went wrong!', { errorCode: 500 });
+// Use quack method directly on provider
+duckBugProvider.quack("INTEGRATION_ERROR", testError);
 ```
 
 ## API Reference
@@ -93,6 +87,8 @@ new DuckSDK(providers: Provider[], config?: LogProviderConfig)
 - `debug(tag: string, payload?: object)`: Log a debug-level message
 - `warn(tag: string, payload?: object)`: Log a warning-level message
 - `error(tag: string, payload?: object)`: Log an error-level message
+- `fatal(tag: string, payload?: object)`: Log an fatal-level message
+- `quack(tag: string, error: Error)`: Report error
 
 ### DuckBugProvider
 
@@ -146,8 +142,13 @@ class TelegramProvider implements Provider {
       DEBUG: '🦆',
       WARN: '⚠️',
       ERROR: '🚨',
+      FATAL: '💀',
     };
     this.sendToTelegram(emojiMap[level], [tag, payload]);
+  }
+
+  quack(tag: string, error: Error): void {
+    this.sendToTelegram('💀', [tag, error.message]);
   }
 
   private sendToTelegram(emoji: string, args: unknown[]) {
