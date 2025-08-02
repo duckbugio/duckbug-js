@@ -26,7 +26,7 @@
     "lint": "yarn biome ci",
     "prepare": "husky",
     "test": "vitest run",
-    "publish": "yarn build && yarn npm publish"
+    "publish": "yarn build && npm publish"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.1",
