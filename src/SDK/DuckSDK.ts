@@ -1,6 +1,5 @@
-import type { LogLevel, LogProviderConfig } from "../Log";
-import { LogProvider, logLevel } from "../Log";
-import type { Provider } from "../Provider";
+import type { LogLevel, LogProviderConfig, Provider } from ".";
+import { LogProvider, logLevel } from ".";
 
 export class DuckSDK {
   private providers;
@@ -28,6 +27,12 @@ export class DuckSDK {
   warn(tag: string, payload?: object) {
     this.sendReportToPlugins(tag, logLevel.WARN, payload);
   }
+
+  fatal(tag: string, payload?: object) {
+    this.sendReportToPlugins(tag, logLevel.FATAL, payload);
+  }
+
+  quack() {}
 
   private sendReportToPlugins(tag: string, level: LogLevel, payload?: object) {
     this.providers.forEach((plugin) => plugin.report(tag, level, payload));

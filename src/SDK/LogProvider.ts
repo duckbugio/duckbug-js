@@ -1,5 +1,5 @@
-import type { Provider } from "../Provider";
 import type { LogProviderConfig } from "./LogProviderConfig";
+import type { Provider } from "./Provider";
 
 export class LogProvider {
   private originalConsole = {
@@ -18,9 +18,11 @@ export class LogProvider {
 
   constructor(
     providers: Array<Provider>,
-    logProviderConfig: LogProviderConfig = this.logProviderConfig,
+    logProviderConfig?: LogProviderConfig,
   ) {
-    this.logProviderConfig = logProviderConfig;
+    if (logProviderConfig) {
+      this.logProviderConfig = logProviderConfig;
+    }
     this.providers = providers;
     this.initialize();
   }
