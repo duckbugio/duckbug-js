@@ -14,7 +14,7 @@ export class DuckBugProvider implements Provider {
       time: this.getTimeStamp(),
       level: logLevel.WARN,
       message: this.convertArgsToString(args[0]),
-      context: this.convertArgsToString(args.slice(1)),
+      context: args.slice(1),
     });
   }
 
@@ -23,7 +23,7 @@ export class DuckBugProvider implements Provider {
       time: this.getTimeStamp(),
       level: logLevel.ERROR,
       message: this.convertArgsToString(args[0]),
-      context: this.convertArgsToString(args.slice(1)),
+      context: args.slice(1),
     });
   }
 
@@ -32,7 +32,7 @@ export class DuckBugProvider implements Provider {
       time: this.getTimeStamp(),
       level: logLevel.INFO,
       message: this.convertArgsToString(args[0]),
-      context: this.convertArgsToString(args.slice(1)),
+      context: args.slice(1),
     });
   }
 
@@ -41,7 +41,7 @@ export class DuckBugProvider implements Provider {
       time: this.getTimeStamp(),
       level,
       message: tag,
-      context: JSON.stringify(payload),
+      context: payload,
     });
   }
 

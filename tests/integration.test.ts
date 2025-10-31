@@ -296,7 +296,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: logLevel.WARN,
           message: "DATA_INTEGRITY_TEST",
-          context: JSON.stringify(testData),
+          context: testData,
         }),
       });
     });
@@ -328,7 +328,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: "DEBUG",
           message: "STRING_TEST",
-          context: '"simple string"',
+          context: "simple string",
         }),
       );
       expect(calls[1][1]?.body).toContain(
@@ -336,7 +336,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: "DEBUG",
           message: "NUMBER_TEST",
-          context: "42",
+          context: 42,
         }),
       );
       expect(calls[2][1]?.body).toContain(
@@ -344,7 +344,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: "DEBUG",
           message: "BOOLEAN_TEST",
-          context: "true",
+          context: true,
         }),
       );
       expect(calls[3][1]?.body).toContain(
@@ -352,7 +352,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: "DEBUG",
           message: "NULL_TEST",
-          context: "null",
+          context: null,
         }),
       );
       expect(calls[4][1]?.body).toContain(
@@ -360,6 +360,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: "DEBUG",
           message: "UNDEFINED_TEST",
+          context: undefined,
         }),
       );
       expect(calls[5][1]?.body).toContain(
@@ -367,7 +368,7 @@ describe("DuckBug Integration Tests", () => {
           time: 1640995200000,
           level: "DEBUG",
           message: "ARRAY_TEST",
-          context: "[1,2,3]",
+          context: [1, 2, 3],
         }),
       );
     });

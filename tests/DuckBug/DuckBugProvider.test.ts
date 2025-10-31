@@ -53,7 +53,7 @@ describe("DuckBugProvider", () => {
         time: 12345,
         level: logLevel.WARN,
         message: "Warning message",
-        context: JSON.stringify([context1, context2]),
+        context: [context1, context2],
       });
     });
 
@@ -66,7 +66,7 @@ describe("DuckBugProvider", () => {
         time: 12345,
         level: logLevel.WARN,
         message: "Single warning",
-        context: "[]",
+        context: [],
       });
     });
 
@@ -79,7 +79,7 @@ describe("DuckBugProvider", () => {
         time: 12345,
         level: logLevel.WARN,
         message: "undefined",
-        context: "[]",
+        context: [],
       });
     });
   });
@@ -99,7 +99,7 @@ describe("DuckBugProvider", () => {
         time: 54321,
         level: logLevel.ERROR,
         message: "Error message",
-        context: JSON.stringify([context1, context2]),
+        context: [context1, context2],
       });
     });
 
@@ -114,7 +114,7 @@ describe("DuckBugProvider", () => {
         time: 54321,
         level: logLevel.ERROR,
         message: '{"type":"TypeError","message":"Cannot read property"}',
-        context: "[]",
+        context: [],
       });
     });
   });
@@ -134,7 +134,7 @@ describe("DuckBugProvider", () => {
         time: 67890,
         level: logLevel.INFO,
         message: "Info message",
-        context: JSON.stringify([context1, context2]),
+        context: [context1, context2],
       });
     });
 
@@ -147,7 +147,7 @@ describe("DuckBugProvider", () => {
         time: 67890,
         level: logLevel.INFO,
         message: "Message",
-        context: JSON.stringify(["arg1", "arg2", "arg3"]),
+        context: ["arg1", "arg2", "arg3"],
       });
     });
   });
@@ -166,7 +166,7 @@ describe("DuckBugProvider", () => {
         time: 11111,
         level: logLevel.DEBUG,
         message: tag,
-        context: '{"userId":123,"action":"click"}',
+        context: payload,
       });
     });
 
@@ -206,7 +206,7 @@ describe("DuckBugProvider", () => {
           time: 33333,
           level,
           message: `TAG_${index}`,
-          context: `{"index":${index}}`,
+          context: { index },
         });
       });
     });
@@ -269,14 +269,14 @@ describe("DuckBugProvider", () => {
         time: 99999,
         level: logLevel.INFO,
         message: "String",
-        context: JSON.stringify([
+        context: [
           123,
           true,
           null,
           undefined,
           { obj: "value" },
           ["array", "item"],
-        ]),
+        ],
       });
     });
   });

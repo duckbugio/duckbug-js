@@ -288,24 +288,26 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should be a no-op method", () => {
-      expect(() => sdk.quack()).not.toThrow();
+    it("should call quack on all providers with tag and error", () => {
+      const tag = "QUACK_TAG";
+      const error = new Error("Test error");
+
+      sdk.quack(tag, error);
+
+      expect(mockProvider1.quack).toHaveBeenCalledTimes(1);
+      expect(mockProvider1.quack).toHaveBeenCalledWith(tag, error);
+      expect(mockProvider2.quack).toHaveBeenCalledTimes(1);
+      expect(mockProvider2.quack).toHaveBeenCalledWith(tag, error);
     });
 
-    it("should not call any provider methods", () => {
-      sdk.quack();
+    it("should work with different error types", () => {
+      const tag = "ERROR_TAG";
+      const error = new TypeError("Type error test");
 
-      expect(mockProvider1.log).not.toHaveBeenCalled();
-      expect(mockProvider1.warn).not.toHaveBeenCalled();
-      expect(mockProvider1.error).not.toHaveBeenCalled();
-      expect(mockProvider1.report).not.toHaveBeenCalled();
-      expect(mockProvider1.quack).not.toHaveBeenCalled();
+      sdk.quack(tag, error);
 
-      expect(mockProvider2.log).not.toHaveBeenCalled();
-      expect(mockProvider2.warn).not.toHaveBeenCalled();
-      expect(mockProvider2.error).not.toHaveBeenCalled();
-      expect(mockProvider2.report).not.toHaveBeenCalled();
-      expect(mockProvider2.quack).not.toHaveBeenCalled();
+      expect(mockProvider1.quack).toHaveBeenCalledWith(tag, error);
+      expect(mockProvider2.quack).toHaveBeenCalledWith(tag, error);
     });
   });
 
