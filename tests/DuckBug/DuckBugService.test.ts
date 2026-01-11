@@ -108,60 +108,77 @@ describe("DuckBugService", () => {
   });
 
   describe("sendError", () => {
-    it("should send error data to the correct endpoint", () => {
-      const errorInfo = {
+    it("should send error request to the correct endpoint", () => {
+      const errorRequest = {
+        time: 1234567890,
         message: "Test error",
-        stack: "Error stack trace",
-        context: "Error context",
+        stacktrace: {
+          raw: "Error: Test error\n    at test.js:10:5",
+          frames: [
+            { index: 0, content: "Error: Test error" },
+            { index: 1, content: "    at test.js:10:5" },
+          ],
+        },
+        file: "test.js",
+        line: 10,
+        context: { message: "Error context" },
       };
 
-      service.sendError(errorInfo);
+      service.sendError(errorRequest);
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(`${config.dsn}/errors`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(errorInfo),
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe(`${config.dsn}/errors`);
+      expect(callArgs[1]?.method).toBe("POST");
+      expect(callArgs[1]?.headers).toEqual({
+        "Content-Type": "application/json",
       });
+
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+      expect(requestBody).toEqual(errorRequest);
     });
 
-    it("should handle error without stack trace", () => {
-      const errorInfo = {
-        message: "Test error without stack",
-        context: "Error context",
+    it("should send error request without context", () => {
+      const errorRequest = {
+        time: 1234567890,
+        message: "Test error",
+        stacktrace: {
+          raw: "",
+          frames: [],
+        },
+        file: "unknown",
+        line: 0,
       };
 
-      service.sendError(errorInfo);
+      service.sendError(errorRequest);
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(`${config.dsn}/errors`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(errorInfo),
-      });
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+      expect(requestBody).toEqual(errorRequest);
     });
 
-    it("should handle error with empty stack", () => {
-      const errorInfo = {
-        message: "Test error with empty stack",
-        stack: "",
-        context: "Error context",
+    it("should send error request with all fields", () => {
+      const errorRequest = {
+        time: 1234567890,
+        message: "Test error",
+        stacktrace: {
+          raw: "Error stack",
+          frames: [{ index: 0, content: "Error stack" }],
+        },
+        file: "index.js",
+        line: 42,
+        context: { key: "value" },
       };
 
-      service.sendError(errorInfo);
+      service.sendError(errorRequest);
 
-      expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(`${config.dsn}/errors`, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(errorInfo),
-      });
+      const callArgs = mockFetch.mock.calls[0];
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+      expect(requestBody.time).toBe(1234567890);
+      expect(requestBody.message).toBe("Test error");
+      expect(requestBody.file).toBe("index.js");
+      expect(requestBody.line).toBe(42);
+      expect(requestBody.context).toEqual({ key: "value" });
     });
 
     it("should use the correct DSN from config for errors", () => {
@@ -170,18 +187,19 @@ describe("DuckBugService", () => {
       };
       const customService = new DuckBugService(customConfig);
 
-      const errorInfo = {
+      const errorRequest = {
+        time: 1234567890,
         message: "Test error",
-        stack: "Stack trace",
-        context: "Error context",
+        stacktrace: { raw: "", frames: [] },
+        file: "test.js",
+        line: 1,
       };
 
-      customService.sendError(errorInfo);
+      customService.sendError(errorRequest);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${customConfig.dsn}/errors`,
-        expect.any(Object),
-      );
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe(`${customConfig.dsn}/errors`);
+      expect(callArgs[1]?.method).toBe("POST");
     });
   });
 

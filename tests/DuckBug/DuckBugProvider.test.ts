@@ -214,45 +214,87 @@ describe("DuckBugProvider", () => {
 
   describe("quack", () => {
     it("should send error with correct parameters", () => {
+      vi.spyOn(Date, "now").mockReturnValue(1234567890);
+
       const tag = "QUACK_ERROR";
       const error = new Error("Something went wrong");
-      error.stack = "Error: Something went wrong\n    at test.js:1:1";
+      error.stack = "Error: Something went wrong\n    at test.js:42:10";
 
       provider.quack(tag, error);
 
       expect(mockService.sendError).toHaveBeenCalledTimes(1);
-      expect(mockService.sendError).toHaveBeenCalledWith({
-        stack: error.stack,
-        message: tag,
-        context: error.message,
-      });
+      const callArgs = mockService.sendError.mock.calls[0][0];
+      expect(callArgs).toHaveProperty("time", 1234567890);
+      expect(callArgs).toHaveProperty("message", tag);
+      expect(callArgs).toHaveProperty("stacktrace");
+      expect(callArgs.stacktrace).toHaveProperty("raw", error.stack);
+      expect(callArgs.stacktrace).toHaveProperty("frames");
+      expect(callArgs).toHaveProperty("file", "test.js");
+      expect(callArgs).toHaveProperty("line", 42);
+      expect(callArgs).toHaveProperty("context");
+      expect(callArgs.context).toEqual({ message: "Something went wrong" });
+
+      vi.restoreAllMocks();
     });
 
     it("should handle error without stack trace", () => {
+      vi.spyOn(Date, "now").mockReturnValue(1234567890);
+
       const tag = "NO_STACK_ERROR";
       const error = new Error("Error without stack");
       error.stack = undefined;
 
       provider.quack(tag, error);
 
-      expect(mockService.sendError).toHaveBeenCalledWith({
-        stack: undefined,
-        message: tag,
-        context: error.message,
-      });
+      const callArgs = mockService.sendError.mock.calls[0][0];
+      expect(callArgs).toHaveProperty("time", 1234567890);
+      expect(callArgs).toHaveProperty("message", tag);
+      expect(callArgs).toHaveProperty("stacktrace");
+      expect(callArgs.stacktrace).toEqual({ raw: "", frames: [] });
+      expect(callArgs).toHaveProperty("file", "unknown");
+      expect(callArgs).toHaveProperty("line", 0);
+      expect(callArgs.context).toEqual({ message: "Error without stack" });
+
+      vi.restoreAllMocks();
     });
 
     it("should handle custom error messages", () => {
+      vi.spyOn(Date, "now").mockReturnValue(1234567890);
+
       const tag = "CUSTOM_ERROR";
       const error = new Error("Custom error message");
+      error.stack = "Error: Custom error message\n    at main (index.js:100:5)";
 
       provider.quack(tag, error);
 
-      expect(mockService.sendError).toHaveBeenCalledWith({
-        stack: error.stack,
-        message: tag,
-        context: "Custom error message",
-      });
+      const callArgs = mockService.sendError.mock.calls[0][0];
+      expect(callArgs).toHaveProperty("time", 1234567890);
+      expect(callArgs).toHaveProperty("message", tag);
+      expect(callArgs).toHaveProperty("stacktrace");
+      expect(callArgs.stacktrace).toHaveProperty("raw", error.stack);
+      expect(callArgs).toHaveProperty("file");
+      expect(callArgs).toHaveProperty("line");
+      expect(callArgs.context).toEqual({ message: "Custom error message" });
+
+      vi.restoreAllMocks();
+    });
+
+    it("should extract file and line from stack trace correctly", () => {
+      vi.spyOn(Date, "now").mockReturnValue(1234567890);
+
+      const tag = "FILE_LINE_TEST";
+      const error = new Error("Test error");
+      error.stack =
+        "Error: Test error\n    at Object.foo (src/utils.ts:25:10)\n    at main (index.js:10:5)";
+
+      provider.quack(tag, error);
+
+      const callArgs = mockService.sendError.mock.calls[0][0];
+      expect(callArgs.file).toBe("src/utils.ts");
+      expect(callArgs.line).toBe(25);
+      expect(callArgs.stacktrace.frames.length).toBeGreaterThan(0);
+
+      vi.restoreAllMocks();
     });
   });
 

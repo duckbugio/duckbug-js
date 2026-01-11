@@ -23,10 +23,10 @@
   ],
   "scripts": {
     "build": "rslib build",
-    "lint": "yarn biome ci",
+    "lint": "bunx biome ci",
     "prepare": "husky",
     "test": "vitest run",
-    "publish": "yarn build && npm publish"
+    "publish": "bun run build && npm publish"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.1",
@@ -37,5 +37,5 @@
     "typescript": "5.8.3",
     "vitest": "^3.2.4"
   },
-  "packageManager": "yarn@3.8.7"
+  "packageManager": "bun@latest"
 }

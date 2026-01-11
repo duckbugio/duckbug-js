@@ -1,6 +1,25 @@
 import type { DuckBugConfig } from "./DuckBugConfig";
 import type { Log } from "./Log";
 
+export type StacktraceFrame = {
+  index: number;
+  content: string;
+};
+
+export type Stacktrace = {
+  raw: string;
+  frames: StacktraceFrame[];
+};
+
+export type ErrorRequest = {
+  time: number;
+  message: string;
+  stacktrace: Stacktrace;
+  file: string;
+  line: number;
+  context?: unknown;
+};
+
 export class DuckBugService {
   constructor(private config: DuckBugConfig) {}
 
@@ -14,13 +33,13 @@ export class DuckBugService {
     });
   }
 
-  sendError(errorInfo: { message: string; stack?: string; context: string }) {
+  sendError(errorRequest: ErrorRequest) {
     fetch(`${this.config.dsn}/errors`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
       },
-      body: JSON.stringify(errorInfo),
+      body: JSON.stringify(errorRequest),
     });
   }
 }

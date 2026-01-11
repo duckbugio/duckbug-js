@@ -1,5 +1,6 @@
 import { type LogLevel, logLevel, type Provider } from "../SDK";
 import type { DuckBugConfig } from "./DuckBugConfig";
+import { processError } from "./DuckBugHelper";
 import { DuckBugService } from "./DuckBugService";
 
 export class DuckBugProvider implements Provider {
@@ -46,11 +47,8 @@ export class DuckBugProvider implements Provider {
   }
 
   quack(tag: string, error: Error): void {
-    this.service.sendError({
-      stack: error.stack,
-      message: tag,
-      context: error.message,
-    });
+    const errorRequest = processError(error, tag, this.getTimeStamp());
+    this.service.sendError(errorRequest);
   }
 
   private convertArgsToString(...args: unknown[]): string {
