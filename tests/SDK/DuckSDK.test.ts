@@ -1,10 +1,7 @@
-// biome-ignore-all lint: complexity/useLiteralKeys
-
-import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { LogProviderConfig, Provider } from "../../src/SDK";
 import { DuckSDK } from "../../src/SDK/DuckSDK";
 import { logLevel } from "../../src/SDK/LogLevel";
-import { LogProvider } from "../../src/SDK/LogProvider";
 
 describe("DuckSDK", () => {
   let mockProvider1: Provider;
@@ -12,6 +9,10 @@ describe("DuckSDK", () => {
   let providers: Provider[];
   let sdk: DuckSDK;
   let logProviderConfig: LogProviderConfig;
+
+  type DuckSDKInternals = {
+    providers: Provider[];
+  };
 
   beforeEach(() => {
     mockProvider1 = {
@@ -45,21 +46,24 @@ describe("DuckSDK", () => {
     it("should initialize with providers", () => {
       sdk = new DuckSDK(providers);
 
-      expect(sdk["providers"]).toBe(providers);
+      const sdkInternal = sdk as unknown as DuckSDKInternals;
+      expect(sdkInternal.providers).toBe(providers);
       // LogProvider is created internally, we test behavior rather than implementation
     });
 
     it("should initialize with providers and logProviderConfig", () => {
       sdk = new DuckSDK(providers, logProviderConfig);
 
-      expect(sdk["providers"]).toBe(providers);
+      const sdkInternal = sdk as unknown as DuckSDKInternals;
+      expect(sdkInternal.providers).toBe(providers);
       // LogProvider is created with config internally
     });
 
     it("should store providers internally", () => {
       sdk = new DuckSDK(providers);
 
-      expect(sdk["providers"]).toBe(providers);
+      const sdkInternal = sdk as unknown as DuckSDKInternals;
+      expect(sdkInternal.providers).toBe(providers);
     });
   });
 

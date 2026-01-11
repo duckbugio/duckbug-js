@@ -1,7 +1,6 @@
 import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import type { DuckBugConfig } from "../../src/DuckBug/DuckBugConfig";
 import { DuckBugProvider } from "../../src/DuckBug/DuckBugProvider";
-import { DuckBugService } from "../../src/DuckBug/DuckBugService";
 import { logLevel } from "../../src/SDK/LogLevel";
 
 describe("DuckBugProvider", () => {
@@ -24,12 +23,13 @@ describe("DuckBugProvider", () => {
 
     // Create provider and replace service with mock
     provider = new DuckBugProvider(config);
-    provider.service = mockService as any;
+    provider.service = mockService as unknown as DuckBugProvider["service"];
   });
 
   describe("constructor", () => {
     it("should create a DuckBugService instance with the provided config", () => {
-      expect(provider.service).toBe(mockService);
+      expect(provider.service.sendLog).toBe(mockService.sendLog);
+      expect(provider.service.sendError).toBe(mockService.sendError);
     });
   });
 

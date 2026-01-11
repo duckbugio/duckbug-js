@@ -1,5 +1,3 @@
-// biome-ignore-all lint: complexity/useLiteralKeys
-
 import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { LogProviderConfig, Provider } from "../../src/SDK";
 import { LogProvider } from "../../src/SDK/LogProvider";
@@ -12,6 +10,16 @@ describe("LogProvider", () => {
     log: typeof console.log;
     error: typeof console.error;
     warn: typeof console.warn;
+  };
+
+  type LogProviderInternals = {
+    providers: Provider[];
+    logProviderConfig: LogProviderConfig;
+    originalConsole: {
+      log: (...args: unknown[]) => unknown;
+      error: (...args: unknown[]) => unknown;
+      warn: (...args: unknown[]) => unknown;
+    };
   };
 
   beforeEach(() => {
@@ -56,9 +64,10 @@ describe("LogProvider", () => {
   describe("constructor", () => {
     it("should initialize with default config", () => {
       const logProvider = new LogProvider(providers);
+      const internal = logProvider as unknown as LogProviderInternals;
 
-      expect(logProvider["providers"]).toBe(providers);
-      expect(logProvider["logProviderConfig"]).toEqual({
+      expect(internal.providers).toBe(providers);
+      expect(internal.logProviderConfig).toEqual({
         logReports: {
           log: false,
           warn: true,
@@ -77,8 +86,9 @@ describe("LogProvider", () => {
       };
 
       const logProvider = new LogProvider(providers, customConfig);
+      const internal = logProvider as unknown as LogProviderInternals;
 
-      expect(logProvider["logProviderConfig"]).toBe(customConfig);
+      expect(internal.logProviderConfig).toBe(customConfig);
     });
 
     it("should store original console methods", () => {
@@ -87,8 +97,9 @@ describe("LogProvider", () => {
       console.warn = originalConsole.warn;
 
       const logProvider = new LogProvider(providers);
+      const internal = logProvider as unknown as LogProviderInternals;
 
-      expect(logProvider["originalConsole"]).toEqual({
+      expect(internal.originalConsole).toEqual({
         log: originalConsole.log,
         error: originalConsole.error,
         warn: originalConsole.warn,
@@ -183,7 +194,8 @@ describe("LogProvider", () => {
         },
       };
       const logProvider = new LogProvider(providers, config);
-      logProvider["originalConsole"].log = mockOriginalLog;
+      const internal = logProvider as unknown as LogProviderInternals;
+      internal.originalConsole.log = mockOriginalLog;
 
       console.log("test message", { data: "value" });
 
@@ -260,7 +272,8 @@ describe("LogProvider", () => {
         },
       };
       const logProvider = new LogProvider(providers, config);
-      logProvider["originalConsole"].warn = mockOriginalWarn;
+      const internal = logProvider as unknown as LogProviderInternals;
+      internal.originalConsole.warn = mockOriginalWarn;
 
       console.warn("warning message");
 
@@ -321,7 +334,8 @@ describe("LogProvider", () => {
         },
       };
       const logProvider = new LogProvider(providers, config);
-      logProvider["originalConsole"].error = mockOriginalError;
+      const internal = logProvider as unknown as LogProviderInternals;
+      internal.originalConsole.error = mockOriginalError;
 
       console.error("error message");
 

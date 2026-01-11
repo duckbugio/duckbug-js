@@ -1,10 +1,13 @@
-import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
+import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { DuckBugConfig } from "../../src/DuckBug/DuckBugConfig";
-import { DuckBugService } from "../../src/DuckBug/DuckBugService";
+import {
+  DuckBugService,
+  type ErrorRequest,
+} from "../../src/DuckBug/DuckBugService";
 import type { Log } from "../../src/DuckBug/Log";
 import { logLevel } from "../../src/SDK/LogLevel";
 
-//@ts-ignore
+// @ts-ignore
 global.fetch = mock(() => Promise.resolve(new Response()));
 
 describe("DuckBugService", () => {
@@ -17,7 +20,7 @@ describe("DuckBugService", () => {
       dsn: "https://api.duckbug.com",
     };
     service = new DuckBugService(config);
-    mockFetch = fetch as ReturnType<typeof mock>;
+    mockFetch = fetch as unknown as ReturnType<typeof mock>;
     mockFetch.mockClear();
   });
 
@@ -27,7 +30,7 @@ describe("DuckBugService", () => {
         message: "Test log message",
         level: logLevel.INFO,
         time: Date.now(),
-        context: "Test context",
+        context: { message: "Test context" },
       };
 
       service.sendLog(logInfo);
@@ -76,7 +79,7 @@ describe("DuckBugService", () => {
           message: `Test message ${index}`,
           level,
           time: Date.now(),
-          context: `Context ${index}`,
+          context: { message: `Context ${index}` },
         };
 
         service.sendLog(logInfo);
@@ -95,7 +98,7 @@ describe("DuckBugService", () => {
         message: "Test message",
         level: logLevel.ERROR,
         time: Date.now(),
-        context: "Test context",
+        context: { message: "Test context" },
       };
 
       customService.sendLog(logInfo);
@@ -208,13 +211,16 @@ describe("DuckBugService", () => {
         message: "First log",
         level: logLevel.INFO,
         time: Date.now(),
-        context: "First context",
+        context: { message: "First context" },
       };
 
-      const errorInfo = {
+      const errorInfo: ErrorRequest = {
+        time: Date.now(),
         message: "First error",
-        stack: "Error stack",
-        context: "Error context",
+        stacktrace: { raw: "Error stack", frames: [] },
+        file: "unknown",
+        line: 0,
+        context: { message: "Error context" },
       };
 
       service.sendLog(logInfo);
