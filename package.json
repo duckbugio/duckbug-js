@@ -31,8 +31,8 @@
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.1",
-    "@commitlint/cli": "^19.6.0",
-    "@commitlint/config-conventional": "^19.6.0",
+    "@commitlint/cli": "^20.3.1",
+    "@commitlint/config-conventional": "^20.3.1",
     "@rslib/core": "0.10.6",
     "@types/bun": "latest",
     "husky": "9.1.7",
