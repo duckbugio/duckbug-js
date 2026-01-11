@@ -181,7 +181,7 @@ const duck = new DuckSDK(providers);
 Install dependencies:
 
 ```bash
-yarn install
+bun install
 ```
 
 ### Build
@@ -189,7 +189,7 @@ yarn install
 Build the library:
 
 ```bash
-yarn build
+bun run build
 ```
 
 ### Linting
@@ -197,7 +197,53 @@ yarn build
 Run linting:
 
 ```bash
-yarn lint
+bun run lint
+```
+
+### Commit Messages
+
+Этот проект использует [Conventional Commits](https://www.conventionalcommits.org/) для стандартизации сообщений коммитов. Все коммиты должны соответствовать следующему формату:
+
+```
+<type>(<scope>): <subject>
+
+<body>
+
+<footer>
+```
+
+#### Типы коммитов (обязательные)
+
+- `feat`: Новая функциональность
+- `fix`: Исправление бага
+- `docs`: Изменения в документации
+- `style`: Форматирование кода (не влияет на выполнение кода)
+- `refactor`: Рефакторинг кода
+- `perf`: Улучшение производительности
+- `test`: Добавление или изменение тестов
+- `build`: Изменения в системе сборки или внешних зависимостях
+- `ci`: Изменения в CI конфигурации
+- `chore`: Обновление задач сборки, настроек и т.д.
+- `revert`: Откат предыдущего коммита
+
+#### Примеры корректных коммитов
+
+```bash
+feat: добавить поддержку логирования ошибок
+fix: исправить утечку памяти в DuckBugProvider
+docs: обновить README с примерами использования
+test: добавить тесты для DuckSDK
+refactor: улучшить структуру классов провайдеров
+```
+
+#### Проверка коммитов
+
+Автоматическая проверка формата коммитов выполняется через git hook. При создании коммита с неправильным форматом вы получите ошибку.
+
+Для ручной проверки сообщения коммита:
+
+```bash
+bun run commitlint -- --from HEAD~1 --to HEAD
 ```
 
 ## TypeScript Support

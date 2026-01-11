@@ -26,10 +26,13 @@
     "lint": "bunx biome ci",
     "prepare": "husky",
     "test": "bun test",
-    "publish": "bun run build && npm publish"
+    "publish": "bun run build && npm publish",
+    "commitlint": "commitlint --edit"
   },
   "devDependencies": {
     "@biomejs/biome": "2.1.1",
+    "@commitlint/cli": "^19.6.0",
+    "@commitlint/config-conventional": "^19.6.0",
     "@rslib/core": "0.10.6",
     "@types/bun": "latest",
     "husky": "9.1.7",
