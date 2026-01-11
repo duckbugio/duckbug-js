@@ -1,23 +1,23 @@
-import { beforeEach, describe, expect, it, vi } from "vitest";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import type { DuckBugConfig } from "../../src/DuckBug/DuckBugConfig";
 import { DuckBugService } from "../../src/DuckBug/DuckBugService";
 import type { Log } from "../../src/DuckBug/Log";
 import { logLevel } from "../../src/SDK/LogLevel";
 
 //@ts-ignore
-global.fetch = vi.fn();
+global.fetch = mock(() => Promise.resolve(new Response()));
 
 describe("DuckBugService", () => {
   let service: DuckBugService;
   let config: DuckBugConfig;
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: ReturnType<typeof mock>;
 
   beforeEach(() => {
     config = {
       dsn: "https://api.duckbug.com",
     };
     service = new DuckBugService(config);
-    mockFetch = vi.mocked(fetch);
+    mockFetch = fetch as ReturnType<typeof mock>;
     mockFetch.mockClear();
   });
 
@@ -100,10 +100,9 @@ describe("DuckBugService", () => {
 
       customService.sendLog(logInfo);
 
-      expect(mockFetch).toHaveBeenCalledWith(
-        `${customConfig.dsn}/logs`,
-        expect.any(Object),
-      );
+      const calls = mockFetch.mock.calls;
+      expect(calls.length).toBeGreaterThan(0);
+      expect(calls[0][0]).toBe(`${customConfig.dsn}/logs`);
     });
   });
 
@@ -223,21 +222,10 @@ describe("DuckBugService", () => {
       service.sendLog({ ...logInfo, message: "Second log" });
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        1,
-        `${config.dsn}/logs`,
-        expect.any(Object),
-      );
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        2,
-        `${config.dsn}/errors`,
-        expect.any(Object),
-      );
-      expect(mockFetch).toHaveBeenNthCalledWith(
-        3,
-        `${config.dsn}/logs`,
-        expect.any(Object),
-      );
+      const calls = mockFetch.mock.calls;
+      expect(calls[0][0]).toBe(`${config.dsn}/logs`);
+      expect(calls[1][0]).toBe(`${config.dsn}/errors`);
+      expect(calls[2][0]).toBe(`${config.dsn}/logs`);
     });
   });
 });

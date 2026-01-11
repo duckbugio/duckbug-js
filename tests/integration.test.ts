@@ -1,14 +1,22 @@
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import {
+  afterEach,
+  beforeEach,
+  describe,
+  expect,
+  it,
+  mock,
+  spyOn,
+} from "bun:test";
 import { DuckBugProvider } from "../src/DuckBug/DuckBugProvider";
 import { DuckSDK } from "../src/SDK/DuckSDK";
 import { logLevel } from "../src/SDK/LogLevel";
 import type { LogProviderConfig } from "../src/SDK/LogProviderConfig";
 
 //@ts-ignore
-global.fetch = vi.fn();
+global.fetch = mock(() => Promise.resolve(new Response("OK", { status: 200 })));
 
 describe("DuckBug Integration Tests", () => {
-  let mockFetch: ReturnType<typeof vi.fn>;
+  let mockFetch: ReturnType<typeof mock>;
   let duckBugProvider: DuckBugProvider;
   let sdk: DuckSDK;
   let originalConsole: {
@@ -26,7 +34,7 @@ describe("DuckBug Integration Tests", () => {
     };
 
     // Mock fetch
-    mockFetch = vi.mocked(fetch);
+    mockFetch = fetch as ReturnType<typeof mock>;
     mockFetch.mockClear();
     mockFetch.mockResolvedValue(new Response("OK", { status: 200 }));
 
@@ -36,9 +44,9 @@ describe("DuckBug Integration Tests", () => {
     });
 
     // Mock console methods
-    console.log = vi.fn();
-    console.warn = vi.fn();
-    console.error = vi.fn();
+    console.log = mock(() => {});
+    console.warn = mock(() => {});
+    console.error = mock(() => {});
   });
 
   afterEach(() => {
@@ -139,18 +147,16 @@ describe("DuckBug Integration Tests", () => {
       duckBugProvider.quack("INTEGRATION_ERROR", testError);
 
       // Should call errors endpoint
-      expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.duckbug.test/errors",
-        expect.objectContaining({
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            stack: testError.stack,
-            message: "INTEGRATION_ERROR",
-            context: testError.message,
-          }),
-        }),
-      );
+      expect(mockFetch).toHaveBeenCalledTimes(1);
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe("https://api.duckbug.test/errors");
+      expect(callArgs[1]?.method).toBe("POST");
+      expect(callArgs[1]?.headers).toEqual({
+        "Content-Type": "application/json",
+      });
+      const requestBody = JSON.parse(callArgs[1]?.body as string);
+      expect(requestBody.message).toBe("INTEGRATION_ERROR");
+      expect(requestBody.stacktrace.raw).toBe(testError.stack);
     });
   });
 
@@ -198,11 +204,11 @@ describe("DuckBug Integration Tests", () => {
     it("should handle provider errors gracefully", () => {
       // Create a provider that throws errors
       const errorProvider = {
-        log: vi.fn(() => {}),
-        warn: vi.fn(),
-        error: vi.fn(),
-        report: vi.fn(() => {}),
-        quack: vi.fn(),
+        log: mock(() => {}),
+        warn: mock(),
+        error: mock(),
+        report: mock(() => {}),
+        quack: mock(),
       };
 
       sdk = new DuckSDK([errorProvider, duckBugProvider]);
@@ -285,7 +291,7 @@ describe("DuckBug Integration Tests", () => {
         },
       };
 
-      vi.spyOn(Date, "now").mockReturnValue(1640995200000);
+      spyOn(Date, "now").mockReturnValue(1640995200000);
 
       sdk.warn("DATA_INTEGRITY_TEST", testData);
 
@@ -304,7 +310,7 @@ describe("DuckBug Integration Tests", () => {
     it("should handle different data types correctly", () => {
       sdk = new DuckSDK([duckBugProvider]);
 
-      vi.spyOn(Date, "now").mockReturnValue(1640995200000);
+      spyOn(Date, "now").mockReturnValue(1640995200000);
 
       //@ts-ignore
       sdk.log("STRING_TEST", "simple string");

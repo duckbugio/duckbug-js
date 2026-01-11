@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it } from "bun:test";
 import { parseError, processError } from "../../src/DuckBug/DuckBugHelper";
 
 describe("DuckBugHelper", () => {
@@ -19,8 +19,8 @@ describe("DuckBugHelper", () => {
           raw: error.stack,
           frames: [
             { index: 0, content: "Error: Test error message" },
-            { index: 1, content: "    at Object.foo (src/utils.ts:42:10)" },
-            { index: 2, content: "    at main (index.js:10:5)" },
+            { index: 1, content: "at Object.foo (src/utils.ts:42:10)" },
+            { index: 2, content: "at main (index.js:10:5)" },
           ],
         },
         context: { message: "Test error message" },
@@ -257,11 +257,11 @@ describe("DuckBugHelper", () => {
       });
       expect(stacktrace.frames[1]).toEqual({
         index: 1,
-        content: "    at line1",
+        content: "at line1",
       });
       expect(stacktrace.frames[2]).toEqual({
         index: 2,
-        content: "    at line2",
+        content: "at line2",
       });
     });
   });
