@@ -12,8 +12,5 @@ dist/
 !.vscode/extensions.json
 .idea
 
-.yarn/*
-!.yarn/releases
-!.yarn/plugins
-.pnp.*
-.npmrc
+# Bun
+bun.lockb

@@ -1,6 +1,4 @@
-// biome-ignore-all lint: complexity/useLiteralKeys
-
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, mock } from "bun:test";
 import type { LogProviderConfig, Provider } from "../../src/SDK";
 import { LogProvider } from "../../src/SDK/LogProvider";
 
@@ -14,6 +12,16 @@ describe("LogProvider", () => {
     warn: typeof console.warn;
   };
 
+  type LogProviderInternals = {
+    providers: Provider[];
+    logProviderConfig: LogProviderConfig;
+    originalConsole: {
+      log: (...args: unknown[]) => unknown;
+      error: (...args: unknown[]) => unknown;
+      warn: (...args: unknown[]) => unknown;
+    };
+  };
+
   beforeEach(() => {
     // Store original console methods
     originalConsole = {
@@ -23,27 +31,27 @@ describe("LogProvider", () => {
     };
 
     mockProvider1 = {
-      log: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      report: vi.fn(),
-      quack: vi.fn(),
+      log: mock(),
+      warn: mock(),
+      error: mock(),
+      report: mock(),
+      quack: mock(),
     };
 
     mockProvider2 = {
-      log: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      report: vi.fn(),
-      quack: vi.fn(),
+      log: mock(),
+      warn: mock(),
+      error: mock(),
+      report: mock(),
+      quack: mock(),
     };
 
     providers = [mockProvider1, mockProvider2];
 
     // Mock console methods
-    console.log = vi.fn();
-    console.error = vi.fn();
-    console.warn = vi.fn();
+    console.log = mock();
+    console.error = mock();
+    console.warn = mock();
   });
 
   afterEach(() => {
@@ -56,9 +64,10 @@ describe("LogProvider", () => {
   describe("constructor", () => {
     it("should initialize with default config", () => {
       const logProvider = new LogProvider(providers);
+      const internal = logProvider as unknown as LogProviderInternals;
 
-      expect(logProvider["providers"]).toBe(providers);
-      expect(logProvider["logProviderConfig"]).toEqual({
+      expect(internal.providers).toBe(providers);
+      expect(internal.logProviderConfig).toEqual({
         logReports: {
           log: false,
           warn: true,
@@ -77,8 +86,9 @@ describe("LogProvider", () => {
       };
 
       const logProvider = new LogProvider(providers, customConfig);
+      const internal = logProvider as unknown as LogProviderInternals;
 
-      expect(logProvider["logProviderConfig"]).toBe(customConfig);
+      expect(internal.logProviderConfig).toBe(customConfig);
     });
 
     it("should store original console methods", () => {
@@ -87,8 +97,9 @@ describe("LogProvider", () => {
       console.warn = originalConsole.warn;
 
       const logProvider = new LogProvider(providers);
+      const internal = logProvider as unknown as LogProviderInternals;
 
-      expect(logProvider["originalConsole"]).toEqual({
+      expect(internal.originalConsole).toEqual({
         log: originalConsole.log,
         error: originalConsole.error,
         warn: originalConsole.warn,
@@ -169,8 +180,8 @@ describe("LogProvider", () => {
     });
 
     it("should call original console.log", () => {
-      const mockOriginalLog = vi.fn();
-      console.log = vi.fn().mockImplementation((...args) => {
+      const mockOriginalLog = mock();
+      console.log = mock((...args: unknown[]) => {
         mockOriginalLog.apply(console, args);
       });
 
@@ -183,7 +194,8 @@ describe("LogProvider", () => {
         },
       };
       const logProvider = new LogProvider(providers, config);
-      logProvider["originalConsole"].log = mockOriginalLog;
+      const internal = logProvider as unknown as LogProviderInternals;
+      internal.originalConsole.log = mockOriginalLog;
 
       console.log("test message", { data: "value" });
 
@@ -246,8 +258,8 @@ describe("LogProvider", () => {
     });
 
     it("should call original console.warn", () => {
-      const mockOriginalWarn = vi.fn();
-      console.warn = vi.fn().mockImplementation((...args) => {
+      const mockOriginalWarn = mock();
+      console.warn = mock((...args: unknown[]) => {
         mockOriginalWarn.apply(console, args);
       });
 
@@ -260,7 +272,8 @@ describe("LogProvider", () => {
         },
       };
       const logProvider = new LogProvider(providers, config);
-      logProvider["originalConsole"].warn = mockOriginalWarn;
+      const internal = logProvider as unknown as LogProviderInternals;
+      internal.originalConsole.warn = mockOriginalWarn;
 
       console.warn("warning message");
 
@@ -307,8 +320,8 @@ describe("LogProvider", () => {
     });
 
     it("should call original console.error", () => {
-      const mockOriginalError = vi.fn();
-      console.error = vi.fn().mockImplementation((...args) => {
+      const mockOriginalError = mock();
+      console.error = mock((...args: unknown[]) => {
         mockOriginalError.apply(console, args);
       });
 
@@ -321,7 +334,8 @@ describe("LogProvider", () => {
         },
       };
       const logProvider = new LogProvider(providers, config);
-      logProvider["originalConsole"].error = mockOriginalError;
+      const internal = logProvider as unknown as LogProviderInternals;
+      internal.originalConsole.error = mockOriginalError;
 
       console.error("error message");
 
@@ -368,9 +382,9 @@ describe("LogProvider", () => {
 
     it("should handle provider errors gracefully", () => {
       //@ts-ignore
-      mockProvider1.log.mockImplementation(() => {});
+      mockProvider1.log = mock(() => {});
 
-      expect(() => console.log("test")).not.Throw();
+      expect(() => console.log("test")).not.toThrow();
       expect(mockProvider1.log).toHaveBeenCalled();
     });
 
