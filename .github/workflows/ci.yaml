@@ -32,7 +32,7 @@ jobs:
         if: github.event_name == 'pull_request'
         uses: wagoid/commitlint-github-action@v6
         with:
-          configFile: commitlint.config.js
+          configFile: commitlint.config.mjs
 
       - name: Run biome
         run: bun run lint
