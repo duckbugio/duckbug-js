@@ -1,14 +1,24 @@
-name: Lint duckbug-js SDK
+name: CI
+
 on:
   pull_request:
     branches:
       - main
+      - beta
+  push:
+    branches:
+      - main
+      - beta
+
 jobs:
-  build:
+  lint-and-test:
+    name: Lint and Test
     runs-on: ubuntu-latest
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v1
@@ -16,10 +26,19 @@ jobs:
           bun-version: latest
 
       - name: Install dependencies
-        run: bun install
+        run: bun install --frozen-lockfile
+
+      - name: Lint commit messages
+        if: github.event_name == 'pull_request'
+        uses: wagoid/commitlint-github-action@v6
+        with:
+          configFile: commitlint.config.js
 
       - name: Run biome
         run: bun run lint
 
-      - name: Run vitest
+      - name: Run tests
         run: bun run test
+
+      - name: Build
+        run: bun run build

@@ -26,7 +26,7 @@
     "lint": "bunx biome ci",
     "prepare": "husky",
     "test": "bun test",
-    "publish": "bun run build && npm publish",
+    "semantic-release": "semantic-release",
     "commitlint": "commitlint --edit"
   },
   "devDependencies": {
@@ -34,9 +34,16 @@
     "@commitlint/cli": "^20.3.1",
     "@commitlint/config-conventional": "^20.3.1",
     "@rslib/core": "0.10.6",
+    "@semantic-release/changelog": "^6.0.3",
+    "@semantic-release/commit-analyzer": "^14.0.0",
+    "@semantic-release/git": "^10.0.1",
+    "@semantic-release/github": "^9.2.6",
+    "@semantic-release/npm": "^12.0.1",
+    "@semantic-release/release-notes-generator": "^12.1.0",
     "@types/bun": "latest",
     "husky": "9.1.7",
     "pinst": "3.0.0",
+    "semantic-release": "^24.0.0",
     "ts-node": "10.9.2",
     "typescript": "5.8.3"
   },
