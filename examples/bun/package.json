@@ -1,0 +1,13 @@
+{
+  "name": "duckbug-bun-example",
+  "version": "1.0.0",
+  "description": "Bun.js example with DuckBug.js integration",
+  "type": "module",
+  "scripts": {
+    "dev": "bun run src/index.ts",
+    "start": "bun run src/index.ts"
+  },
+  "dependencies": {
+    "@duckbug/js": "file:../.."
+  }
+}

@@ -35,17 +35,5 @@ export default {
   ignores: [
     (commit) => /^WIP/i.test(commit),
     (commit) => /^Merge/i.test(commit),
-    // Временное игнорирование старых коммитов до настройки commitlint
-    // TODO: Удалить после исправления старых коммитов или слияния PR
-    (commit) => {
-      const oldCommitPatterns = [
-        /^Fix\s/i, // "Fix quack function"
-        /^Support\s/i, // "Support bun in ci"
-        /^Rewrite\s/i, // "Rewrite unit tests to bun"
-        /^Code review/i, // "Code review"
-        /^chore: Add/i, // "chore: Add convention commit rules"
-      ];
-      return oldCommitPatterns.some((pattern) => pattern.test(commit));
-    },
   ],
 };

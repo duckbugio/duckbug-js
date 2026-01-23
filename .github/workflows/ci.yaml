@@ -33,8 +33,6 @@ jobs:
         uses: wagoid/commitlint-github-action@v6
         with:
           configFile: commitlint.config.mjs
-          failOnWarnings: false
-          commitDepth: 50
 
       - name: Run biome
         run: bun run lint
