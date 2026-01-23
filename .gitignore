@@ -14,3 +14,9 @@ dist/
 
 # Bun
 bun.lockb
+
+# Examples
+examples/*/node_modules
+examples/*/dist
+examples/*/.env
+examples/*/.env.local

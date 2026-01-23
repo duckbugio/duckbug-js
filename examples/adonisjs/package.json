@@ -1,0 +1,20 @@
+{
+  "name": "duckbug-adonisjs-example",
+  "version": "1.0.0",
+  "description": "AdonisJS example with DuckBug.js integration",
+  "scripts": {
+    "dev": "node --loader tsx --watch ace serve --watch",
+    "build": "node ace build",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@duckbug/js": "file:../..",
+    "@adonisjs/core": "^7.0.0",
+    "@adonisjs/http-server": "^7.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.8.3"
+  }
+}

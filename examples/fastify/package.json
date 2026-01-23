@@ -1,0 +1,20 @@
+{
+  "name": "duckbug-fastify-example",
+  "version": "1.0.0",
+  "description": "Fastify example with DuckBug.js integration",
+  "type": "module",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsc",
+    "start": "node dist/index.js"
+  },
+  "dependencies": {
+    "@duckbug/js": "file:../..",
+    "fastify": "^4.24.3"
+  },
+  "devDependencies": {
+    "@types/node": "^20.11.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.8.3"
+  }
+}
