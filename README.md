@@ -31,76 +31,234 @@ pnpm add @duckbug/js
 
 ### Basic Usage
 
+DSN must follow the ingest URL shape from the DuckBug SDK spec (`duckbug-sdk-spec`): `{origin}/ingest/{projectId}:{publicKey}` or `{origin}/api/ingest/{projectId}:{publicKey}` (for example on `duckbug.io`).
+
 ```typescript
-import { DuckSDK, DuckBugProvider } from '@duckbug/js';
+import { Duck, DuckBugProvider, Pond } from '@duckbug/js';
 
-// Initialize with DuckBug.io provider
-const providers = [
-  new DuckBugProvider({
-    dsn: 'your-duckbug-dsn-here'
-  })
-];
+const dsn = 'https://api.duckbug.io/ingest/your-project-id:your-public-key';
+const { extraSensitiveKeys } = Pond.ripple(['custom_secret']);
 
-// Create SDK instance with optional configuration
-const duck = new DuckSDK(providers, {
-  logReports: {
-    log: false,
-    warn: true,
-    error: true,
-  }
+const duck = new Duck(
+  [new DuckBugProvider({ dsn, extraSensitiveKeys })],
+  {
+    logReports: {
+      log: false,
+      warn: true,
+      error: true,
+    },
+  },
+);
+
+// Branded + idiomatic error capture
+const err = new Error('Something failed');
+duck.quack('checkout_failed', err);
+duck.captureException(err, 'checkout_failed');
+
+// Logging (levels normalized to DEBUG, INFO, WARN, ERROR, FATAL)
+duck.warn('Slow query', { ms: 1200 });
+```
+
+`DuckSDK` remains available as an alias of the same runtime; prefer `Duck` for new code.
+
+Before process exit, await `duck.flush()` so queued HTTP work finishes (for example at the end of an `async main()`).
+
+## Full usage example
+
+End-to-end pattern for a Node/Bun service: DSN from env, scope (release, user, fingerprint), privacy pipeline, `beforeSend`, batched transport with retries, transport errors, console forwarding, global error handlers, structured logs, manual errors, and clean shutdown.
+
+```typescript
+import {
+  Duck,
+  DuckBugProvider,
+  Pond,
+  registerNodeGlobalErrorHandlers,
+} from "@duckbug/js";
+
+const dsn = process.env.DUCKBUG_DSN;
+if (!dsn) {
+  throw new Error("Set DUCKBUG_DSN to your ingest URL");
+}
+
+const { extraSensitiveKeys } = Pond.ripple([
+  "custom_secret",
+  "internalToken",
+]);
+
+// Transport + ingest errors. Privacy (strip / sanitize / eventId / beforeSend) is applied in `Duck` when you use the core client.
+const duckBug = new DuckBugProvider({
+  dsn,
+  transport: {
+    maxBatchSize: 25,
+    maxRetries: 2,
+    retryDelayMs: 200,
+  },
+  onTransportError: (info) => {
+    console.error("[duckbug transport]", info.message, info.kind, info.itemCount);
+  },
 });
 
-// Start logging
-duck.log('Info message', { userId: 123, action: 'user_login' });
-duck.debug('Debug message', { debugInfo: 'Connection established' });
-duck.warn('Warning message', { warning: 'Rate limit approaching' });
-duck.error('Error message', { error: 'Database connection failed' });
-duck.fatal('Fatal message', { error: 'Ay, caramba' });
+const duck = new Duck(
+  [duckBug],
+  {
+    logReports: {
+      log: true,
+      warn: true,
+      error: true,
+    },
+  },
+  {
+    extraSensitiveKeys,
+    // Omit whole sections before sanitize (see StrippableIngestSection in types)
+    stripSections: ["cookies", "headers"],
+    beforeSend: async (arg) => {
+      // Drop PII-heavy events in dev, or tweak payload
+      if (process.env.NODE_ENV === "test") {
+        return null;
+      }
+      if (arg.kind === "log" && arg.event.message.includes("healthcheck")) {
+        return null;
+      }
+      return arg.event;
+    },
+  },
+);
 
-//Send error
-const testError = new Error("Integration test error");
-testError.stack =
-  "Error: Integration test error\n    at integration.test.ts:1:1";
+// Applied to every subsequent log / error (merge into event)
+duck.setScope({
+  release: "my-app@1.4.2",
+  environment: process.env.NODE_ENV ?? "development",
+  service: "checkout-api",
+  fingerprint: "checkout-api-default",
+  // Prefer nesting session-like data under context; top-level `session` may be rejected by ingest.
+  context: { deployment: "eu-west" },
+});
 
-// Use quack method directly on provider
-duckBugProvider.quack("INTEGRATION_ERROR", testError);
+const unregisterGlobals = registerNodeGlobalErrorHandlers({
+  duck,
+  rejectionTag: "unhandledRejection",
+  exceptionTag: "uncaughtException",
+});
+
+async function main() {
+  duck.debug("boot", { pid: process.pid });
+
+  try {
+    await doCheckout();
+  } catch (e) {
+    const err = e instanceof Error ? e : new Error(String(e));
+    duck.quack("checkout_failed", err);
+    duck.captureException(err, "checkout_failed");
+  }
+
+  duck.warn("slow_query", { table: "orders", ms: 850 });
+  duck.error("inventory_low", { sku: "SKU-12", qty: 2 });
+  duck.fatal("migration_required", { from: "v10", to: "v11" });
+
+  await duck.flush();
+}
+
+async function doCheckout() {
+  // ...
+}
+
+main()
+  .catch((e) => {
+    console.error(e);
+    process.exitCode = 1;
+  })
+  .finally(async () => {
+    unregisterGlobals();
+    await duck.flush();
+  });
+```
+
+**Direct provider (no `Duck`)** — same privacy defaults via `finalizeIngestEvent` inside the provider; you call `sendLog` / `sendError` with `DuckBugLogEvent` / `DuckBugErrorEvent` shapes:
+
+```typescript
+import { DuckBugProvider, logLevel } from "@duckbug/js";
+
+const provider = new DuckBugProvider({ dsn });
+provider.sendLog({
+  time: Date.now(),
+  level: logLevel.INFO,
+  message: "Job finished",
+  platform: "node",
+  dTags: ["worker", "nightly"],
+});
+await provider.flush();
 ```
 
 ## API Reference
 
-### DuckSDK
+### Duck / DuckSDK
 
-The main SDK class that manages logging across multiple providers.
+The main SDK class fans out canonical log and error events to all registered providers.
 
 #### Constructor
 
 ```typescript
-new DuckSDK(providers: Provider[], config?: LogProviderConfig)
+new Duck(
+  providers: Provider[],
+  logProviderConfig?: LogProviderConfig,
+  options?: DuckSDKOptions,
+)
 ```
 
 - `providers`: Array of provider instances
-- `config`: Optional configuration for log reporting levels
+- `logProviderConfig`: Optional configuration for console interception (`LogProvider`)
+- `options`: Optional `beforeSend`, `stripSections`, `extraSensitiveKeys` (strip → sanitize → `eventId` → `beforeSend` → providers; matches `duckbug-sdk-spec`)
 
 #### Methods
 
-- `log(tag: string, payload?: object)`: Log an info-level message
-- `debug(tag: string, payload?: object)`: Log a debug-level message
-- `warn(tag: string, payload?: object)`: Log a warning-level message
-- `error(tag: string, payload?: object)`: Log an error-level message
-- `fatal(tag: string, payload?: object)`: Log an fatal-level message
-- `quack(tag: string, error: Error)`: Report error
+- `log` / `debug` / `warn` / `error` / `fatal(tag, payload?)`: structured logs
+- `quack(tag, error)`: branded manual error capture; tag is sent as `dTags`, message comes from `error.message`
+- `captureException(error, tag?)`: idiomatic alias for `quack` (default tag `error`)
+- `setScope(partial)`: merge shared metadata into subsequent events
+- `flush()`: await transport drains on providers that implement `flush` (for example `DuckBugProvider`)
+
+Each captured log/error gets a UUID `eventId` when omitted (idempotency / retries).
 
 ### DuckBugProvider
 
-The official DuckBug.io provider for sending logs to the DuckBug.io platform.
+First-party provider: posts JSON to single-event ingest by default, or to `/logs/batch` and `/errors/batch` when `transport.maxBatchSize > 1` (body is a JSON array, as required by the DuckBug API).
 
 #### Constructor
 
 ```typescript
-new DuckBugProvider(config: DuckConfig)
+new DuckBugProvider({
+  dsn: string,
+  extraSensitiveKeys?: string[],
+  stripSections?: StrippableIngestSection[],
+  beforeSend?: (arg) => event | null | undefined | Promise<...>,
+  transport?: {
+    maxBatchSize?: number; // default 1 — one POST per event
+    maxRetries?: number;
+    retryDelayMs?: number;
+    fetchImpl?: typeof fetch;
+  },
+  onTransportError?: (info: TransportFailureInfo) => void,
+})
+// or
+DuckBugProvider.fromDSN(dsn)
 ```
 
-- `config.dsn`: Your DuckBug.io DSN (Data Source Name)
+- `config.dsn`: full ingest URL, e.g. `https://api.duckbug.io/ingest/myProject:myKey`
+- `flush()`: returns a `Promise` that resolves when queued requests for this provider have been sent
+
+### Privacy, batching, and Node hooks
+
+- **Strip sections**: omit whole request fields (`headers`, `cookies`, `session`, …) before sanitize via `stripSections` on `DuckBugProvider` or `DuckSDK` options.
+- **`beforeSend`**: on `Duck` / `DuckSDK` for all providers; on `DuckBugProvider` when using the provider without the core client. Return `null` to drop an event.
+- **Node global errors** (optional, no core framework deps):
+
+```typescript
+import { Duck, DuckBugProvider, registerNodeGlobalErrorHandlers } from '@duckbug/js';
+
+const duck = new Duck([DuckBugProvider.fromDSN(dsn)]);
+const unregister = registerNodeGlobalErrorHandlers({ duck });
+// ... on shutdown: unregister();
+```
 
 ### Log Provider Configuration
 
@@ -116,62 +274,54 @@ type LogProviderConfig = {
 
 ## Custom Providers
 
-You can create custom providers by implementing the `Provider` interface:
+Implement `Provider`: handle canonical `DuckBugLogEvent` / `DuckBugErrorEvent` from `sendLog` / `sendError` (optional second argument `SendEventMeta` when events are already finalized in `DuckSDK`), and optional console-style methods for `LogProvider` hooks.
 
 ```typescript
-import { Provider, LogLevel } from '@duckbug/js';
+import type {
+  DuckBugErrorEvent,
+  DuckBugLogEvent,
+  Provider,
+} from '@duckbug/js';
 
 class TelegramProvider implements Provider {
   constructor(private botToken: string, private chatId: string) {}
 
+  sendLog(event: DuckBugLogEvent): void {
+    this.sendToTelegram('📝', `${event.level} ${event.message}`);
+  }
+
+  sendError(event: DuckBugErrorEvent): void {
+    this.sendToTelegram('💀', event.message);
+  }
+
   log(...args: unknown[]): void {
-    this.sendToTelegram('📝', args);
+    this.sendToTelegram('📝', String(args[0]));
   }
 
   warn(...args: unknown[]): void {
-    this.sendToTelegram('⚠️', args);
+    this.sendToTelegram('⚠️', String(args[0]));
   }
 
   error(...args: unknown[]): void {
-    this.sendToTelegram('🚨', args);
+    this.sendToTelegram('🚨', String(args[0]));
   }
 
-  report(tag: string, level: LogLevel, payload?: object): void {
-    const emojiMap: Record<LogLevel, string> = {
-      INFO: '📝',
-      DEBUG: '🦆',
-      WARN: '⚠️',
-      ERROR: '🚨',
-      FATAL: '💀',
-    };
-    this.sendToTelegram(emojiMap[level], [tag, payload]);
-  }
-
-  quack(tag: string, error: Error): void {
-    this.sendToTelegram('💀', [tag, error.message]);
-  }
-
-  private sendToTelegram(emoji: string, args: unknown[]) {
-    const message = `${emoji} ${args.join(' ')}`;
-    // Implementation to send message to Telegram
+  private sendToTelegram(emoji: string, text: string) {
+    const message = `${emoji} ${text}`;
     fetch(`https://api.telegram.org/bot${this.botToken}/sendMessage`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        chat_id: this.chatId,
-        text: message
-      })
+      body: JSON.stringify({ chat_id: this.chatId, text: message }),
     });
   }
 }
 
-// Usage
 const providers = [
-  new DuckBugProvider({ dsn: 'your-dsn' }),
-  new TelegramProvider('your-bot-token', 'your-chat-id')
+  DuckBugProvider.fromDSN('https://api.duckbug.io/ingest/project:key'),
+  new TelegramProvider('your-bot-token', 'your-chat-id'),
 ];
 
-const duck = new DuckSDK(providers);
+const duck = new Duck(providers);
 ```
 
 ## Development
@@ -325,7 +475,12 @@ BREAKING CHANGE: изменена структура конфигурации Du
 This package includes TypeScript definitions. All exports are fully typed:
 
 ```typescript
-import type { Provider, DuckConfig, LogLevel } from '@duckbug/js';
+import type {
+  Provider,
+  DuckBugConfig,
+  DuckBugLogEvent,
+  LogLevel,
+} from "@duckbug/js";
 ```
 
 ## Browser Compatibility

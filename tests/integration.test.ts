@@ -12,6 +12,10 @@ import { DuckSDK } from "../src/SDK/DuckSDK";
 import { logLevel } from "../src/SDK/LogLevel";
 import type { LogProviderConfig } from "../src/SDK/LogProviderConfig";
 
+const INGEST_DSN = "https://api.duckbug.test/ingest/demo:secretkey";
+const LOGS_URL = `${new URL(INGEST_DSN).origin}/ingest/demo:secretkey/logs`;
+const ERRORS_URL = `${new URL(INGEST_DSN).origin}/ingest/demo:secretkey/errors`;
+
 //@ts-ignore
 global.fetch = mock(() => Promise.resolve(new Response("OK", { status: 200 })));
 
@@ -40,7 +44,7 @@ describe("DuckBug Integration Tests", () => {
 
     // Create DuckBug provider
     duckBugProvider = new DuckBugProvider({
-      dsn: "https://api.duckbug.test",
+      dsn: INGEST_DSN,
     });
 
     // Mock console methods
@@ -76,12 +80,14 @@ describe("DuckBug Integration Tests", () => {
       sdk.debug("SDK_DEBUG", { debug: "test debug" });
       sdk.fatal("SDK_FATAL", { fatal: "test fatal" });
 
+      await sdk.flush();
+
       // Verify API calls were made
       expect(mockFetch).toHaveBeenCalledTimes(5);
 
       // Verify log endpoint calls
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.duckbug.test/logs",
+        LOGS_URL,
         expect.objectContaining({
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -90,7 +96,7 @@ describe("DuckBug Integration Tests", () => {
       );
 
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.duckbug.test/logs",
+        LOGS_URL,
         expect.objectContaining({
           method: "POST",
           headers: { "Content-Type": "application/json" },
@@ -99,7 +105,7 @@ describe("DuckBug Integration Tests", () => {
       );
     });
 
-    it("should handle console override integration", () => {
+    it("should handle console override integration", async () => {
       const logProviderConfig: LogProviderConfig = {
         logReports: {
           log: true,
@@ -115,6 +121,8 @@ describe("DuckBug Integration Tests", () => {
       console.log("Console log message", { data: "test" });
       console.warn("Console warn message", { warning: "test" });
       console.error("Console error message", { error: "test" });
+
+      await sdk.flush();
 
       // Verify API calls were made for console methods
       expect(mockFetch).toHaveBeenCalledTimes(3);
@@ -136,7 +144,7 @@ describe("DuckBug Integration Tests", () => {
       expect(errorCall).toBeDefined();
     });
 
-    it("should handle quack method for error reporting", () => {
+    it("should handle quack method for error reporting", async () => {
       sdk = new DuckSDK([duckBugProvider]);
 
       const testError = new Error("Integration test error");
@@ -146,69 +154,79 @@ describe("DuckBug Integration Tests", () => {
       // Use quack method directly on provider
       duckBugProvider.quack("INTEGRATION_ERROR", testError);
 
+      await duckBugProvider.flush();
+
       // Should call errors endpoint
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe("https://api.duckbug.test/errors");
+      expect(callArgs[0]).toBe(ERRORS_URL);
       expect(callArgs[1]?.method).toBe("POST");
       expect(callArgs[1]?.headers).toEqual({
         "Content-Type": "application/json",
       });
       const requestBody = JSON.parse(callArgs[1]?.body as string);
-      expect(requestBody.message).toBe("INTEGRATION_ERROR");
+      expect(requestBody.message).toBe("Integration test error");
+      expect(requestBody.dTags).toEqual(["INTEGRATION_ERROR"]);
       expect(requestBody.stacktrace.raw).toBe(testError.stack);
     });
   });
 
   describe("Multiple Providers Integration", () => {
-    it("should work with multiple providers", () => {
+    it("should work with multiple providers", async () => {
       const provider1 = new DuckBugProvider({
-        dsn: "https://api1.duckbug.test",
+        dsn: "https://api1.duckbug.test/ingest/a:1",
       });
 
       const provider2 = new DuckBugProvider({
-        dsn: "https://api2.duckbug.test",
+        dsn: "https://api2.duckbug.test/ingest/b:2",
       });
 
       sdk = new DuckSDK([provider1, provider2]);
 
       sdk.log("MULTI_PROVIDER_TEST", { data: "test" });
 
+      await sdk.flush();
+
       // Should make calls to both providers
       expect(mockFetch).toHaveBeenCalledTimes(2);
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api1.duckbug.test/logs",
+        "https://api1.duckbug.test/ingest/a:1/logs",
         expect.any(Object),
       );
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api2.duckbug.test/logs",
+        "https://api2.duckbug.test/ingest/b:2/logs",
         expect.any(Object),
       );
     });
   });
 
   describe("Error Handling Integration", () => {
-    it("should handle network failures gracefully", () => {
+    it("should handle network failures gracefully", async () => {
       mockFetch.mockRejectedValue(new Error("Network error"));
 
-      sdk = new DuckSDK([duckBugProvider]);
+      const fragile = new DuckBugProvider({
+        dsn: INGEST_DSN,
+        transport: { maxRetries: 0 },
+      });
+      sdk = new DuckSDK([fragile]);
 
       // Should not throw even if network fails
       expect(() => {
         sdk.log("NETWORK_ERROR_TEST", { data: "test" });
       }).not.toThrow();
 
+      await sdk.flush();
       expect(mockFetch).toHaveBeenCalled();
     });
 
-    it("should handle provider errors gracefully", () => {
+    it("should handle provider errors gracefully", async () => {
       // Create a provider that throws errors
       const errorProvider = {
+        sendLog: mock(() => {}),
+        sendError: mock(),
         log: mock(() => {}),
         warn: mock(),
         error: mock(),
-        report: mock(() => {}),
-        quack: mock(),
       };
 
       sdk = new DuckSDK([errorProvider, duckBugProvider]);
@@ -218,13 +236,15 @@ describe("DuckBug Integration Tests", () => {
         sdk.log("PROVIDER_ERROR_TEST", { data: "test" });
       }).not.toThrow();
 
+      await sdk.flush();
+
       // The working provider should still be called
       expect(mockFetch).toHaveBeenCalled();
     });
   });
 
   describe("Configuration Integration", () => {
-    it("should respect log provider configuration", () => {
+    it("should respect log provider configuration", async () => {
       const selectiveConfig: LogProviderConfig = {
         logReports: {
           log: false,
@@ -239,17 +259,19 @@ describe("DuckBug Integration Tests", () => {
       console.warn("Should be intercepted");
       console.error("Should not be intercepted");
 
+      await sdk.flush();
+
       // Only warn should trigger the provider
       expect(mockFetch).toHaveBeenCalledTimes(1);
       expect(mockFetch).toHaveBeenCalledWith(
-        "https://api.duckbug.test/logs",
+        LOGS_URL,
         expect.objectContaining({
           body: expect.stringContaining("Should be intercepted"),
         }),
       );
     });
 
-    it("should handle disabled console overrides", () => {
+    it("should handle disabled console overrides", async () => {
       const disabledConfig: LogProviderConfig = {
         logReports: {
           log: false,
@@ -269,12 +291,13 @@ describe("DuckBug Integration Tests", () => {
 
       // But direct SDK methods should still work
       sdk.log("Direct SDK call");
+      await sdk.flush();
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
   });
 
   describe("Data Flow Integration", () => {
-    it("should maintain data integrity through the entire pipeline", () => {
+    it("should maintain data integrity through the entire pipeline", async () => {
       sdk = new DuckSDK([duckBugProvider]);
 
       const testData = {
@@ -295,19 +318,32 @@ describe("DuckBug Integration Tests", () => {
 
       sdk.warn("DATA_INTEGRITY_TEST", testData);
 
-      expect(mockFetch).toHaveBeenCalledWith("https://api.duckbug.test/logs", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      await sdk.flush();
+
+      expect(mockFetch).toHaveBeenCalledWith(
+        LOGS_URL,
+        expect.objectContaining({
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+        }),
+      );
+      const body = JSON.parse(
+        (mockFetch.mock.calls[0][1] as RequestInit).body as string,
+      );
+      expect(body).toEqual(
+        expect.objectContaining({
           time: 1640995200000,
           level: logLevel.WARN,
           message: "DATA_INTEGRITY_TEST",
+          platform: "node",
+          sdk: { name: "@duckbug/js", version: "0.1.3" },
           context: testData,
+          eventId: expect.any(String),
         }),
-      });
+      );
     });
 
-    it("should handle different data types correctly", () => {
+    it("should handle different data types correctly", async () => {
       sdk = new DuckSDK([duckBugProvider]);
 
       spyOn(Date, "now").mockReturnValue(1640995200000);
@@ -325,54 +361,50 @@ describe("DuckBug Integration Tests", () => {
       //@ts-ignore
       sdk.log("ARRAY_TEST", [1, 2, 3]);
 
+      await sdk.flush();
+
       expect(mockFetch).toHaveBeenCalledTimes(6);
 
       // Verify each call has the correct data
       const calls = mockFetch.mock.calls;
-      expect(calls[0][1]?.body).toContain(
-        JSON.stringify({
+      expect(JSON.parse(calls[0][1]?.body as string)).toEqual(
+        expect.objectContaining({
           time: 1640995200000,
           level: "DEBUG",
           message: "STRING_TEST",
+          platform: "node",
           context: "simple string",
+          eventId: expect.any(String),
         }),
       );
-      expect(calls[1][1]?.body).toContain(
-        JSON.stringify({
-          time: 1640995200000,
-          level: "DEBUG",
+      expect(JSON.parse(calls[1][1]?.body as string)).toEqual(
+        expect.objectContaining({
           message: "NUMBER_TEST",
           context: 42,
         }),
       );
-      expect(calls[2][1]?.body).toContain(
-        JSON.stringify({
-          time: 1640995200000,
-          level: "DEBUG",
+      expect(JSON.parse(calls[2][1]?.body as string)).toEqual(
+        expect.objectContaining({
           message: "BOOLEAN_TEST",
           context: true,
         }),
       );
-      expect(calls[3][1]?.body).toContain(
-        JSON.stringify({
-          time: 1640995200000,
-          level: "DEBUG",
+      expect(JSON.parse(calls[3][1]?.body as string)).toEqual(
+        expect.objectContaining({
           message: "NULL_TEST",
           context: null,
         }),
       );
-      expect(calls[4][1]?.body).toContain(
-        JSON.stringify({
+      expect(JSON.parse(calls[4][1]?.body as string)).toEqual(
+        expect.objectContaining({
           time: 1640995200000,
           level: "DEBUG",
           message: "UNDEFINED_TEST",
-          context: undefined,
         }),
       );
-      expect(calls[5][1]?.body).toContain(
-        JSON.stringify({
-          time: 1640995200000,
-          level: "DEBUG",
+      expect(JSON.parse(calls[4][1]?.body as string).context).toBeUndefined();
+      expect(JSON.parse(calls[5][1]?.body as string)).toEqual(
+        expect.objectContaining({
           message: "ARRAY_TEST",
           context: [1, 2, 3],
         }),
@@ -381,7 +413,7 @@ describe("DuckBug Integration Tests", () => {
   });
 
   describe("Real-world Usage Scenarios", () => {
-    it("should handle typical application logging scenario", () => {
+    it("should handle typical application logging scenario", async () => {
       const config: LogProviderConfig = {
         logReports: {
           log: true,
@@ -405,21 +437,24 @@ describe("DuckBug Integration Tests", () => {
         duckBugProvider.quack("APPLICATION_ERROR", error as Error);
       }
 
+      await sdk.flush();
+      await duckBugProvider.flush();
+
       // Verify all expected calls were made
       expect(mockFetch).toHaveBeenCalledTimes(6); // 4 logs + 1 error
 
       const logCalls = mockFetch.mock.calls.filter(
-        (call) => call[0] === "https://api.duckbug.test/logs",
+        (call) => call[0] === LOGS_URL,
       );
       const errorCalls = mockFetch.mock.calls.filter(
-        (call) => call[0] === "https://api.duckbug.test/errors",
+        (call) => call[0] === ERRORS_URL,
       );
 
       expect(logCalls).toHaveLength(5);
       expect(errorCalls).toHaveLength(1);
     });
 
-    it("should handle high-frequency logging", () => {
+    it("should handle high-frequency logging", async () => {
       sdk = new DuckSDK([duckBugProvider]);
 
       // Simulate high-frequency logging
@@ -427,21 +462,15 @@ describe("DuckBug Integration Tests", () => {
         sdk.log(`HIGH_FREQ_${i}`, { iteration: i });
       }
 
+      await sdk.flush();
       expect(mockFetch).toHaveBeenCalledTimes(100);
     });
   });
 
   describe("Edge Cases Integration", () => {
-    it("should handle empty and null configurations", () => {
-      // Test with minimal configuration
-      const minimalProvider = new DuckBugProvider({ dsn: "" });
-      sdk = new DuckSDK([minimalProvider]);
-
-      sdk.log("MINIMAL_CONFIG_TEST");
-
-      expect(mockFetch).toHaveBeenCalledWith(
-        "/logs", // Empty DSN results in relative URL
-        expect.any(Object),
+    it("should reject invalid DSN", () => {
+      expect(() => new DuckBugProvider({ dsn: "" })).toThrow(
+        "Invalid DuckBug DSN",
       );
     });
 
@@ -454,6 +483,7 @@ describe("DuckBug Integration Tests", () => {
       );
 
       await Promise.all(promises);
+      await sdk.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(10);
     });

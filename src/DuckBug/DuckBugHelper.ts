@@ -1,4 +1,15 @@
-import type { ErrorRequest, Stacktrace } from "./DuckBugService";
+import type { DuckBugErrorEvent, IngestJsonValue } from "../contract";
+import { SDK_IDENTITY } from "../sdkIdentity";
+
+export type StacktraceFrame = {
+  index: number;
+  content: string;
+};
+
+export type Stacktrace = {
+  raw: string;
+  frames: StacktraceFrame[];
+};
 
 type ParsedError = {
   file: string;
@@ -6,6 +17,22 @@ type ParsedError = {
   stacktrace: Stacktrace;
   context: unknown;
 };
+
+function tryJsonObjectFromMessage(message: string): IngestJsonValue | null {
+  const trimmed = message.trim();
+  if (!trimmed.startsWith("{") && !trimmed.startsWith("[")) {
+    return null;
+  }
+  try {
+    const v = JSON.parse(message) as unknown;
+    if (v !== null && typeof v === "object") {
+      return v as IngestJsonValue;
+    }
+  } catch {
+    /* ignore */
+  }
+  return null;
+}
 
 function parseStacktrace(stack: string | undefined): {
   file: string;
@@ -21,12 +48,12 @@ function parseStacktrace(stack: string | undefined): {
 
     let firstStackLineWithFile = null;
     for (let i = 1; i < stackLines.length; i++) {
-      const line = stackLines[i];
+      const lineStr = stackLines[i];
       if (
-        line.indexOf("at ") !== -1 &&
-        (line.indexOf(":") !== -1 || line.indexOf("(") !== -1)
+        lineStr.indexOf("at ") !== -1 &&
+        (lineStr.indexOf(":") !== -1 || lineStr.indexOf("(") !== -1)
       ) {
-        firstStackLineWithFile = line;
+        firstStackLineWithFile = lineStr;
         break;
       }
     }
@@ -46,10 +73,10 @@ function parseStacktrace(stack: string | undefined): {
     stacktrace = {
       raw: stack,
       frames: stackLines
-        .filter((line) => line.trim())
-        .map((line, index) => ({
+        .filter((lineStr) => lineStr.trim())
+        .map((lineStr, index) => ({
           index,
-          content: line.trim(),
+          content: lineStr.trim(),
         })),
     };
   } else {
@@ -88,19 +115,44 @@ export function parseError(error: Error): ParsedError {
   };
 }
 
+/**
+ * Builds a canonical DuckBug error event: {@link error.message} is the primary
+ * `message` field; `tag` is sent as `dTags` for grouping/search.
+ */
 export function processError(
   error: Error,
-  message: string,
+  tag: string,
   time: number,
-): ErrorRequest {
+): DuckBugErrorEvent {
   const parsed = parseError(error);
+  const message =
+    typeof error.message === "string" && error.message.length > 0
+      ? error.message
+      : "Error";
 
-  return {
+  const event: DuckBugErrorEvent = {
     time,
     message,
     stacktrace: parsed.stacktrace,
+    stacktraceAsString: error.stack ?? "",
     file: parsed.file,
     line: parsed.line,
-    context: parsed.context,
+    exception: {
+      type: error.name,
+      message: error.message,
+    },
+    platform: "node",
+    sdk: { ...SDK_IDENTITY },
   };
+
+  if (tag.length > 0) {
+    event.dTags = [tag];
+  }
+
+  const fromJson = tryJsonObjectFromMessage(error.message);
+  if (fromJson) {
+    event.extra = fromJson;
+  }
+
+  return event;
 }

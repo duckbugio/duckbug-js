@@ -31,19 +31,19 @@ describe("LogProvider", () => {
     };
 
     mockProvider1 = {
+      sendLog: mock(),
+      sendError: mock(),
       log: mock(),
       warn: mock(),
       error: mock(),
-      report: mock(),
-      quack: mock(),
     };
 
     mockProvider2 = {
+      sendLog: mock(),
+      sendError: mock(),
       log: mock(),
       warn: mock(),
       error: mock(),
-      report: mock(),
-      quack: mock(),
     };
 
     providers = [mockProvider1, mockProvider2];

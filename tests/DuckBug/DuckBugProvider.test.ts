@@ -13,7 +13,7 @@ describe("DuckBugProvider", () => {
 
   beforeEach(() => {
     config = {
-      dsn: "https://api.duckbug.com",
+      dsn: "https://api.duckbug.com/ingest/my-project:my-key",
     };
 
     mockService = {
@@ -44,12 +44,14 @@ describe("DuckBugProvider", () => {
       provider.warn(message, context1, context2);
 
       expect(mockService.sendLog).toHaveBeenCalledTimes(1);
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 12345,
-        level: logLevel.WARN,
-        message: "Warning message",
-        context: [context1, context2],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 12345,
+          level: logLevel.WARN,
+          message: "Warning message",
+          context: { args: [context1, context2] },
+        }),
+      );
     });
 
     it("should handle single argument", () => {
@@ -57,12 +59,13 @@ describe("DuckBugProvider", () => {
 
       provider.warn("Single warning");
 
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 12345,
-        level: logLevel.WARN,
-        message: "Single warning",
-        context: [],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 12345,
+          level: logLevel.WARN,
+          message: "Single warning",
+        }),
+      );
     });
 
     it("should handle no arguments", () => {
@@ -70,12 +73,13 @@ describe("DuckBugProvider", () => {
 
       provider.warn();
 
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 12345,
-        level: logLevel.WARN,
-        message: "undefined",
-        context: [],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 12345,
+          level: logLevel.WARN,
+          message: "undefined",
+        }),
+      );
     });
   });
 
@@ -90,12 +94,14 @@ describe("DuckBugProvider", () => {
       provider.error(message, context1, context2);
 
       expect(mockService.sendLog).toHaveBeenCalledTimes(1);
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 54321,
-        level: logLevel.ERROR,
-        message: "Error message",
-        context: [context1, context2],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 54321,
+          level: logLevel.ERROR,
+          message: "Error message",
+          context: { args: [context1, context2] },
+        }),
+      );
     });
 
     it("should handle objects as first argument", () => {
@@ -105,12 +111,13 @@ describe("DuckBugProvider", () => {
 
       provider.error(errorObj);
 
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 54321,
-        level: logLevel.ERROR,
-        message: '{"type":"TypeError","message":"Cannot read property"}',
-        context: [],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 54321,
+          level: logLevel.ERROR,
+          message: '{"type":"TypeError","message":"Cannot read property"}',
+        }),
+      );
     });
   });
 
@@ -125,12 +132,14 @@ describe("DuckBugProvider", () => {
       provider.log(message, context1, context2);
 
       expect(mockService.sendLog).toHaveBeenCalledTimes(1);
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 67890,
-        level: logLevel.INFO,
-        message: "Info message",
-        context: [context1, context2],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 67890,
+          level: logLevel.INFO,
+          message: "Info message",
+          context: { args: [context1, context2] },
+        }),
+      );
     });
 
     it("should handle multiple string arguments", () => {
@@ -138,12 +147,14 @@ describe("DuckBugProvider", () => {
 
       provider.log("Message", "arg1", "arg2", "arg3");
 
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 67890,
-        level: logLevel.INFO,
-        message: "Message",
-        context: ["arg1", "arg2", "arg3"],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 67890,
+          level: logLevel.INFO,
+          message: "Message",
+          context: { args: ["arg1", "arg2", "arg3"] },
+        }),
+      );
     });
   });
 
@@ -157,12 +168,14 @@ describe("DuckBugProvider", () => {
       provider.report(tag, logLevel.DEBUG, payload);
 
       expect(mockService.sendLog).toHaveBeenCalledTimes(1);
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 11111,
-        level: logLevel.DEBUG,
-        message: tag,
-        context: payload,
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 11111,
+          level: logLevel.DEBUG,
+          message: tag,
+          context: payload,
+        }),
+      );
     });
 
     it("should handle report without payload", () => {
@@ -172,12 +185,17 @@ describe("DuckBugProvider", () => {
 
       provider.report(tag, logLevel.FATAL);
 
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 22222,
-        level: logLevel.FATAL,
-        message: tag,
-        context: undefined,
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 22222,
+          level: logLevel.FATAL,
+          message: tag,
+        }),
+      );
+      expect(
+        (mockService.sendLog as ReturnType<typeof mock>).mock.calls[0][0]
+          .context,
+      ).toBeUndefined();
     });
 
     it("should work with all log levels", () => {
@@ -197,12 +215,15 @@ describe("DuckBugProvider", () => {
 
       expect(mockService.sendLog).toHaveBeenCalledTimes(levels.length);
       levels.forEach((level, index) => {
-        expect(mockService.sendLog).toHaveBeenNthCalledWith(index + 1, {
-          time: 33333,
-          level,
-          message: `TAG_${index}`,
-          context: { index },
-        });
+        expect(mockService.sendLog).toHaveBeenNthCalledWith(
+          index + 1,
+          expect.objectContaining({
+            time: 33333,
+            level,
+            message: `TAG_${index}`,
+            context: { index },
+          }),
+        );
       });
     });
   });
@@ -220,14 +241,17 @@ describe("DuckBugProvider", () => {
       expect(mockService.sendError).toHaveBeenCalledTimes(1);
       const callArgs = mockService.sendError.mock.calls[0][0];
       expect(callArgs).toHaveProperty("time", 1234567890);
-      expect(callArgs).toHaveProperty("message", tag);
+      expect(callArgs).toHaveProperty("message", "Something went wrong");
+      expect(callArgs).toHaveProperty("dTags", [tag]);
       expect(callArgs).toHaveProperty("stacktrace");
       expect(callArgs.stacktrace).toHaveProperty("raw", error.stack);
       expect(callArgs.stacktrace).toHaveProperty("frames");
       expect(callArgs).toHaveProperty("file", "test.js");
       expect(callArgs).toHaveProperty("line", 42);
-      expect(callArgs).toHaveProperty("context");
-      expect(callArgs.context).toEqual({ message: "Something went wrong" });
+      expect(callArgs.exception).toEqual({
+        type: "Error",
+        message: "Something went wrong",
+      });
     });
 
     it("should handle error without stack trace", () => {
@@ -241,12 +265,12 @@ describe("DuckBugProvider", () => {
 
       const callArgs = mockService.sendError.mock.calls[0][0];
       expect(callArgs).toHaveProperty("time", 1234567890);
-      expect(callArgs).toHaveProperty("message", tag);
+      expect(callArgs).toHaveProperty("message", "Error without stack");
+      expect(callArgs).toHaveProperty("dTags", [tag]);
       expect(callArgs).toHaveProperty("stacktrace");
       expect(callArgs.stacktrace).toEqual({ raw: "", frames: [] });
       expect(callArgs).toHaveProperty("file", "unknown");
       expect(callArgs).toHaveProperty("line", 0);
-      expect(callArgs.context).toEqual({ message: "Error without stack" });
     });
 
     it("should handle custom error messages", () => {
@@ -260,12 +284,12 @@ describe("DuckBugProvider", () => {
 
       const callArgs = mockService.sendError.mock.calls[0][0];
       expect(callArgs).toHaveProperty("time", 1234567890);
-      expect(callArgs).toHaveProperty("message", tag);
+      expect(callArgs).toHaveProperty("message", "Custom error message");
+      expect(callArgs).toHaveProperty("dTags", [tag]);
       expect(callArgs).toHaveProperty("stacktrace");
       expect(callArgs.stacktrace).toHaveProperty("raw", error.stack);
       expect(callArgs).toHaveProperty("file");
       expect(callArgs).toHaveProperty("line");
-      expect(callArgs.context).toEqual({ message: "Custom error message" });
     });
 
     it("should extract file and line from stack trace correctly", () => {
@@ -294,19 +318,16 @@ describe("DuckBugProvider", () => {
         "item",
       ]);
 
-      expect(mockService.sendLog).toHaveBeenCalledWith({
-        time: 99999,
-        level: logLevel.INFO,
-        message: "String",
-        context: [
-          123,
-          true,
-          null,
-          undefined,
-          { obj: "value" },
-          ["array", "item"],
-        ],
-      });
+      expect(mockService.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 99999,
+          level: logLevel.INFO,
+          message: "String",
+          context: {
+            args: [123, true, null, null, { obj: "value" }, ["array", "item"]],
+          },
+        }),
+      );
     });
   });
 
