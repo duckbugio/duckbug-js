@@ -1,7 +1,20 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { LogProviderConfig, Provider } from "../../src/SDK";
-import { DuckSDK } from "../../src/SDK/DuckSDK";
+import { Duck, DuckSDK } from "../../src/SDK/DuckSDK";
 import { logLevel } from "../../src/SDK/LogLevel";
+
+function createMockProvider(): Provider {
+  return {
+    sendLog: mock(),
+    sendError: mock(),
+    log: mock(),
+    warn: mock(),
+    error: mock(),
+  };
+}
+
+/** Second argument passed by DuckSDK after core finalize pipeline. */
+const SDK_SKIP_PIPELINE = { skipPrivacyPipeline: true as const };
 
 describe("DuckSDK", () => {
   let mockProvider1: Provider;
@@ -15,22 +28,8 @@ describe("DuckSDK", () => {
   };
 
   beforeEach(() => {
-    mockProvider1 = {
-      log: mock(),
-      warn: mock(),
-      error: mock(),
-      report: mock(),
-      quack: mock(),
-    };
-
-    mockProvider2 = {
-      log: mock(),
-      warn: mock(),
-      error: mock(),
-      report: mock(),
-      quack: mock(),
-    };
-
+    mockProvider1 = createMockProvider();
+    mockProvider2 = createMockProvider();
     providers = [mockProvider1, mockProvider2];
 
     logProviderConfig = {
@@ -48,7 +47,6 @@ describe("DuckSDK", () => {
 
       const sdkInternal = sdk as unknown as DuckSDKInternals;
       expect(sdkInternal.providers).toBe(providers);
-      // LogProvider is created internally, we test behavior rather than implementation
     });
 
     it("should initialize with providers and logProviderConfig", () => {
@@ -56,7 +54,6 @@ describe("DuckSDK", () => {
 
       const sdkInternal = sdk as unknown as DuckSDKInternals;
       expect(sdkInternal.providers).toBe(providers);
-      // LogProvider is created with config internally
     });
 
     it("should store providers internally", () => {
@@ -72,24 +69,22 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should call report on all providers with DEBUG level", () => {
+    it("should call sendLog on all providers with DEBUG level", () => {
       const tag = "LOG_TAG";
       const payload = { data: "test" };
 
       sdk.log(tag, payload);
 
-      expect(mockProvider1.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        payload,
+      expect(mockProvider1.sendLog).toHaveBeenCalledTimes(1);
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: logLevel.DEBUG,
+          message: tag,
+          context: payload,
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider2.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        payload,
-      );
+      expect(mockProvider2.sendLog).toHaveBeenCalledTimes(1);
     });
 
     it("should work without payload", () => {
@@ -97,16 +92,17 @@ describe("DuckSDK", () => {
 
       sdk.log(tag);
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        undefined,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: tag,
+          level: logLevel.DEBUG,
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        undefined,
-      );
+      expect(
+        (mockProvider1.sendLog as ReturnType<typeof mock>).mock.calls[0][0]
+          .context,
+      ).toBeUndefined();
     });
   });
 
@@ -115,23 +111,19 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should call report on all providers with DEBUG level", () => {
+    it("should call sendLog on all providers with ERROR level", () => {
       const tag = "ERROR_TAG";
       const payload = { error: "details" };
 
       sdk.error(tag, payload);
 
-      expect(mockProvider1.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        payload,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        payload,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: logLevel.ERROR,
+          message: tag,
+          context: payload,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
 
@@ -140,15 +132,12 @@ describe("DuckSDK", () => {
 
       sdk.error(tag);
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        undefined,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        undefined,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: tag,
+          level: logLevel.ERROR,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
   });
@@ -158,23 +147,19 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should call report on all providers with DEBUG level", () => {
+    it("should call sendLog on all providers with DEBUG level", () => {
       const tag = "DEBUG_TAG";
       const payload = { debug: "info" };
 
       sdk.debug(tag, payload);
 
-      expect(mockProvider1.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        payload,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        payload,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: logLevel.DEBUG,
+          message: tag,
+          context: payload,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
 
@@ -183,15 +168,12 @@ describe("DuckSDK", () => {
 
       sdk.debug(tag);
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        undefined,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.DEBUG,
-        undefined,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: tag,
+          level: logLevel.DEBUG,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
   });
@@ -201,23 +183,19 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should call report on all providers with WARN level", () => {
+    it("should call sendLog on all providers with WARN level", () => {
       const tag = "WARN_TAG";
       const payload = { warning: "message" };
 
       sdk.warn(tag, payload);
 
-      expect(mockProvider1.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.WARN,
-        payload,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.WARN,
-        payload,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: logLevel.WARN,
+          message: tag,
+          context: payload,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
 
@@ -226,15 +204,12 @@ describe("DuckSDK", () => {
 
       sdk.warn(tag);
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.WARN,
-        undefined,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.WARN,
-        undefined,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: tag,
+          level: logLevel.WARN,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
   });
@@ -244,23 +219,19 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should call report on all providers with FATAL level", () => {
+    it("should call sendLog on all providers with FATAL level", () => {
       const tag = "FATAL_TAG";
       const payload = { fatal: "error" };
 
       sdk.fatal(tag, payload);
 
-      expect(mockProvider1.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.FATAL,
-        payload,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledTimes(1);
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.FATAL,
-        payload,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          level: logLevel.FATAL,
+          message: tag,
+          context: payload,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
 
@@ -269,15 +240,12 @@ describe("DuckSDK", () => {
 
       sdk.fatal(tag);
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.FATAL,
-        undefined,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        tag,
-        logLevel.FATAL,
-        undefined,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: tag,
+          level: logLevel.FATAL,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
   });
@@ -287,16 +255,21 @@ describe("DuckSDK", () => {
       sdk = new DuckSDK(providers);
     });
 
-    it("should call quack on all providers with tag and error", () => {
+    it("should call sendError on all providers with built event", () => {
       const tag = "QUACK_TAG";
       const error = new Error("Test error");
 
       sdk.quack(tag, error);
 
-      expect(mockProvider1.quack).toHaveBeenCalledTimes(1);
-      expect(mockProvider1.quack).toHaveBeenCalledWith(tag, error);
-      expect(mockProvider2.quack).toHaveBeenCalledTimes(1);
-      expect(mockProvider2.quack).toHaveBeenCalledWith(tag, error);
+      expect(mockProvider1.sendError).toHaveBeenCalledTimes(1);
+      expect(mockProvider1.sendError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Test error",
+          dTags: [tag],
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+      expect(mockProvider2.sendError).toHaveBeenCalledTimes(1);
     });
 
     it("should work with different error types", () => {
@@ -305,12 +278,17 @@ describe("DuckSDK", () => {
 
       sdk.quack(tag, error);
 
-      expect(mockProvider1.quack).toHaveBeenCalledWith(tag, error);
-      expect(mockProvider2.quack).toHaveBeenCalledWith(tag, error);
+      expect(mockProvider1.sendError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "Type error test",
+          dTags: [tag],
+        }),
+        SDK_SKIP_PIPELINE,
+      );
     });
   });
 
-  describe("sendReportToPlugins (private method behavior)", () => {
+  describe("emit to providers", () => {
     beforeEach(() => {
       sdk = new DuckSDK(providers);
     });
@@ -326,21 +304,73 @@ describe("DuckSDK", () => {
 
       singleProviderSDK.warn("SINGLE_PROVIDER_TAG", { test: true });
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        "SINGLE_PROVIDER_TAG",
-        logLevel.WARN,
-        { test: true },
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "SINGLE_PROVIDER_TAG",
+          level: logLevel.WARN,
+          context: { test: true },
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider2.report).not.toHaveBeenCalled();
+      expect(mockProvider2.sendLog).not.toHaveBeenCalled();
     });
 
     it("should handle provider with error", () => {
-      //@ts-ignore
-      mockProvider1.report.mockImplementation(() => {});
+      (mockProvider1.sendLog as ReturnType<typeof mock>).mockImplementation(
+        () => {},
+      );
 
-      // Should not throw even if one provider fails
       expect(() => sdk.log("ERROR_TEST")).not.toThrow();
-      expect(mockProvider2.report).toHaveBeenCalled();
+      expect(mockProvider2.sendLog).toHaveBeenCalledWith(
+        expect.anything(),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+  });
+
+  describe("Duck.captureException", () => {
+    it("delegates to quack with default tag", () => {
+      const duck = new Duck(providers);
+      const err = new Error("cap");
+      duck.captureException(err);
+      expect(mockProvider1.sendError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "cap",
+          dTags: ["error"],
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+
+    it("passes custom tag to quack", () => {
+      const duck = new Duck(providers);
+      duck.captureException(new Error("x"), "my_tag");
+      expect(mockProvider1.sendError).toHaveBeenCalledWith(
+        expect.objectContaining({ dTags: ["my_tag"] }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+  });
+
+  describe("beforeSend", () => {
+    it("drops event when hook returns null", () => {
+      sdk = new DuckSDK(providers, undefined, {
+        beforeSend: () => null,
+      });
+      sdk.log("dropped");
+      expect(mockProvider1.sendLog).not.toHaveBeenCalled();
+    });
+
+    it("mutates log when hook returns new object", () => {
+      sdk = new DuckSDK(providers, undefined, {
+        beforeSend: (arg) =>
+          arg.kind === "log" ? { ...arg.event, message: "patched" } : arg.event,
+      });
+      sdk.log("orig");
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "patched" }),
+        SDK_SKIP_PIPELINE,
+      );
     });
   });
 
@@ -356,38 +386,52 @@ describe("DuckSDK", () => {
       sdk.error("ERROR_TAG", { error: true });
       sdk.fatal("FATAL_TAG", { fatal: true });
 
-      expect(mockProvider1.report).toHaveBeenCalledTimes(5);
-      expect(mockProvider2.report).toHaveBeenCalledTimes(5);
+      expect(mockProvider1.sendLog).toHaveBeenCalledTimes(5);
 
-      expect(mockProvider1.report).toHaveBeenNthCalledWith(
+      expect(mockProvider1.sendLog).toHaveBeenNthCalledWith(
         1,
-        "LOG_TAG",
-        logLevel.DEBUG,
-        { log: true },
+        expect.objectContaining({
+          message: "LOG_TAG",
+          level: logLevel.DEBUG,
+          context: { log: true },
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider1.report).toHaveBeenNthCalledWith(
+      expect(mockProvider1.sendLog).toHaveBeenNthCalledWith(
         2,
-        "DEBUG_TAG",
-        logLevel.DEBUG,
-        { debug: true },
+        expect.objectContaining({
+          message: "DEBUG_TAG",
+          level: logLevel.DEBUG,
+          context: { debug: true },
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider1.report).toHaveBeenNthCalledWith(
+      expect(mockProvider1.sendLog).toHaveBeenNthCalledWith(
         3,
-        "WARN_TAG",
-        logLevel.WARN,
-        { warn: true },
+        expect.objectContaining({
+          message: "WARN_TAG",
+          level: logLevel.WARN,
+          context: { warn: true },
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider1.report).toHaveBeenNthCalledWith(
+      expect(mockProvider1.sendLog).toHaveBeenNthCalledWith(
         4,
-        "ERROR_TAG",
-        logLevel.DEBUG,
-        { error: true },
+        expect.objectContaining({
+          message: "ERROR_TAG",
+          level: logLevel.ERROR,
+          context: { error: true },
+        }),
+        SDK_SKIP_PIPELINE,
       );
-      expect(mockProvider1.report).toHaveBeenNthCalledWith(
+      expect(mockProvider1.sendLog).toHaveBeenNthCalledWith(
         5,
-        "FATAL_TAG",
-        logLevel.FATAL,
-        { fatal: true },
+        expect.objectContaining({
+          message: "FATAL_TAG",
+          level: logLevel.FATAL,
+          context: { fatal: true },
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
 
@@ -395,20 +439,22 @@ describe("DuckSDK", () => {
       const complexPayload = {
         user: { id: 123, name: "John" },
         metadata: { timestamp: Date.now(), version: "1.0.0" },
-        nested: { deep: { value: "test" } },
+        nested: {
+          deep: {
+            value: "test",
+          },
+        },
       };
 
       sdk.log("COMPLEX_TAG", complexPayload);
 
-      expect(mockProvider1.report).toHaveBeenCalledWith(
-        "COMPLEX_TAG",
-        logLevel.DEBUG,
-        complexPayload,
-      );
-      expect(mockProvider2.report).toHaveBeenCalledWith(
-        "COMPLEX_TAG",
-        logLevel.DEBUG,
-        complexPayload,
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "COMPLEX_TAG",
+          level: logLevel.DEBUG,
+          context: complexPayload,
+        }),
+        SDK_SKIP_PIPELINE,
       );
     });
   });

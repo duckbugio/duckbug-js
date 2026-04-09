@@ -26,10 +26,13 @@ export default {
     ],
     "subject-min-length": [2, "always", 10],
     "subject-max-length": [2, "always", 72],
-    "subject-case": [2, "always", "lower-case"],
+    // Allow proper nouns / acronyms (e.g. DuckBug, API); required for `feat!:` breaking headers.
+    "subject-case": [0],
     "subject-empty": [2, "never"],
     "subject-full-stop": [2, "never", "."],
     "header-max-length": [2, "always", 100],
+    // Long BREAKING CHANGE paragraphs and tooling footers (e.g. Co-authored-by).
+    "footer-max-line-length": [0],
   },
   defaultIgnores: true,
   ignores: [

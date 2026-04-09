@@ -1,0 +1,126 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://duckbug.io/schemas/log-event.schema.json",
+  "title": "DuckBug Log Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["time", "level", "message"],
+  "properties": {
+    "eventId": {
+      "type": "string",
+      "format": "uuid"
+    },
+    "fingerprint": {
+      "type": "string",
+      "minLength": 1
+    },
+    "time": {
+      "type": "integer",
+      "minimum": 0
+    },
+    "level": {
+      "type": "string",
+      "enum": ["DEBUG", "INFO", "WARN", "ERROR", "FATAL"]
+    },
+    "message": {
+      "type": "string",
+      "minLength": 1
+    },
+    "dTags": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    },
+    "context": {
+      "description": "Any JSON value.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "ip": {
+      "type": "string"
+    },
+    "url": {
+      "type": "string"
+    },
+    "method": {
+      "type": "string"
+    },
+    "headers": {
+      "$ref": "#/$defs/map"
+    },
+    "queryParams": {
+      "$ref": "#/$defs/map"
+    },
+    "bodyParams": {
+      "$ref": "#/$defs/map"
+    },
+    "cookies": {
+      "$ref": "#/$defs/map"
+    },
+    "session": {
+      "$ref": "#/$defs/map"
+    },
+    "files": {
+      "$ref": "#/$defs/map"
+    },
+    "env": {
+      "$ref": "#/$defs/map"
+    },
+    "platform": {
+      "type": "string"
+    },
+    "release": {
+      "type": "string"
+    },
+    "environment": {
+      "type": "string"
+    },
+    "dist": {
+      "type": "string"
+    },
+    "serverName": {
+      "type": "string"
+    },
+    "service": {
+      "type": "string"
+    },
+    "requestId": {
+      "type": "string"
+    },
+    "transaction": {
+      "type": "string"
+    },
+    "traceId": {
+      "type": "string"
+    },
+    "spanId": {
+      "type": "string"
+    },
+    "sdk": {
+      "description": "Any JSON value.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "user": {
+      "description": "Any JSON value.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "runtime": {
+      "description": "Any JSON value.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "breadcrumbs": {
+      "description": "Any JSON value.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    },
+    "extra": {
+      "description": "Any JSON value.",
+      "type": ["object", "array", "string", "number", "boolean", "null"]
+    }
+  },
+  "$defs": {
+    "map": {
+      "type": "object",
+      "additionalProperties": true
+    }
+  }
+}

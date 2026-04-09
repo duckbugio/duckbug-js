@@ -19,13 +19,17 @@
   },
   "files": [
     "dist",
+    "schemas",
     "README.md"
   ],
   "scripts": {
     "build": "rslib build",
+    "check": "bun run lint && bun run typecheck && bun test",
     "lint": "bunx biome ci",
     "prepare": "husky",
     "test": "bun test",
+    "typecheck": "tsc --noEmit -p tsconfig.json",
+    "test:live-ingest": "DUCKBUG_EXPECT_LIVE_INGEST=1 bun test --env-file=.env ./tests/duckbugLiveIngestEnv.ingest.ts",
     "semantic-release": "semantic-release",
     "commitlint": "commitlint --edit"
   },
@@ -41,6 +45,8 @@
     "@semantic-release/npm": "^12.0.1",
     "@semantic-release/release-notes-generator": "^14.1.0",
     "@types/bun": "latest",
+    "ajv": "^8.17.1",
+    "ajv-formats": "^3.0.1",
     "husky": "9.1.7",
     "pinst": "3.0.0",
     "semantic-release": "^24.0.0",

@@ -1,0 +1,39 @@
+---
+description: After TS/JS changes, verify with Bun — Biome lint/format, TypeScript, tests.
+globs: "**/*.{ts,tsx,js,jsx,mjs,cjs,json,jsonc}"
+alwaysApply: false
+---
+
+# Проверки качества (Bun)
+
+Перед завершением задачи по коду **запускай проверки через Bun** и **устраняй ошибки**.
+
+## Линт и формат
+
+В этом репозитории **отдельного Prettier нет** — линт и форматирование делаются **Biome**.
+
+- CI-проверка (как в проекте): `bun run lint` (внутри: `bunx biome ci`).
+- Автоисправление при необходимости: `bunx biome check --write` по затронутым путям или `.`.
+
+Если в проект добавят **Prettier**, дополнительно: `bunx prettier --check .` (или по файлам).
+
+## TypeScript
+
+- `bun run typecheck` — `tsc --noEmit` по корневому `tsconfig.json` (сейчас только `src/`).
+
+Типы в `tests/` проверяются в основном через **`bun test`**.
+
+## Тесты
+
+- `bun test` — полный набор.
+- Опционально live-ingest (нужен `DUCKBUG_TEST_DSN`): `bun run test:live-ingest`.
+
+## Порядок
+
+1. `bun run lint`
+2. `bun run typecheck` — **всегда**, если менял `src/**/*.ts`
+3. `bun test`
+
+Либо одной командой: `bun run check` (lint + typecheck + test).
+
+Не считай задачу закрытой, пока эти шаги для затронутого кода не проходят (или явно не задокументировано исключение).

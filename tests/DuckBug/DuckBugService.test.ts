@@ -1,11 +1,12 @@
 import { beforeEach, describe, expect, it, mock } from "bun:test";
 import type { DuckBugConfig } from "../../src/DuckBug/DuckBugConfig";
-import {
-  DuckBugService,
-  type ErrorRequest,
-} from "../../src/DuckBug/DuckBugService";
+import { DuckBugService } from "../../src/DuckBug/DuckBugService";
 import type { Log } from "../../src/DuckBug/Log";
 import { logLevel } from "../../src/SDK/LogLevel";
+
+const TEST_DSN = "https://api.duckbug.com/ingest/test-project:test-key";
+const logsUrl = `${new URL(TEST_DSN).origin}/ingest/test-project:test-key/logs`;
+const errorsUrl = `${new URL(TEST_DSN).origin}/ingest/test-project:test-key/errors`;
 
 // @ts-ignore
 global.fetch = mock(() => Promise.resolve(new Response()));
@@ -17,7 +18,7 @@ describe("DuckBugService", () => {
 
   beforeEach(() => {
     config = {
-      dsn: "https://api.duckbug.com",
+      dsn: TEST_DSN,
     };
     service = new DuckBugService(config);
     mockFetch = fetch as unknown as ReturnType<typeof mock>;
@@ -25,7 +26,7 @@ describe("DuckBugService", () => {
   });
 
   describe("sendLog", () => {
-    it("should send log data to the correct endpoint", () => {
+    it("should send log data to the correct endpoint", async () => {
       const logInfo: Log = {
         message: "Test log message",
         level: logLevel.INFO,
@@ -34,9 +35,10 @@ describe("DuckBugService", () => {
       };
 
       service.sendLog(logInfo);
+      await service.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(`${config.dsn}/logs`, {
+      expect(mockFetch).toHaveBeenCalledWith(logsUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -45,7 +47,7 @@ describe("DuckBugService", () => {
       });
     });
 
-    it("should handle log with undefined context", () => {
+    it("should handle log with undefined context", async () => {
       const logInfo: Log = {
         message: "Test log message",
         level: logLevel.WARN,
@@ -54,9 +56,10 @@ describe("DuckBugService", () => {
       };
 
       service.sendLog(logInfo);
+      await service.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(`${config.dsn}/logs`, {
+      expect(mockFetch).toHaveBeenCalledWith(logsUrl, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -65,7 +68,7 @@ describe("DuckBugService", () => {
       });
     });
 
-    it("should work with different log levels", () => {
+    it("should work with different log levels", async () => {
       const logLevels = [
         logLevel.DEBUG,
         logLevel.INFO,
@@ -85,12 +88,14 @@ describe("DuckBugService", () => {
         service.sendLog(logInfo);
       });
 
+      await service.flush();
       expect(mockFetch).toHaveBeenCalledTimes(logLevels.length);
     });
 
-    it("should use the correct DSN from config", () => {
+    it("should use the correct DSN from config", async () => {
+      const customDsn = "https://custom-api.example.com/ingest/p:k";
       const customConfig: DuckBugConfig = {
-        dsn: "https://custom-api.example.com",
+        dsn: customDsn,
       };
       const customService = new DuckBugService(customConfig);
 
@@ -102,15 +107,18 @@ describe("DuckBugService", () => {
       };
 
       customService.sendLog(logInfo);
+      await customService.flush();
 
       const calls = mockFetch.mock.calls;
       expect(calls.length).toBeGreaterThan(0);
-      expect(calls[0][0]).toBe(`${customConfig.dsn}/logs`);
+      expect(calls[0][0]).toBe(
+        "https://custom-api.example.com/ingest/p:k/logs",
+      );
     });
   });
 
   describe("sendError", () => {
-    it("should send error request to the correct endpoint", () => {
+    it("should send error request to the correct endpoint", async () => {
       const errorRequest = {
         time: 1234567890,
         message: "Test error",
@@ -127,10 +135,11 @@ describe("DuckBugService", () => {
       };
 
       service.sendError(errorRequest);
+      await service.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe(`${config.dsn}/errors`);
+      expect(callArgs[0]).toBe(errorsUrl);
       expect(callArgs[1]?.method).toBe("POST");
       expect(callArgs[1]?.headers).toEqual({
         "Content-Type": "application/json",
@@ -140,7 +149,7 @@ describe("DuckBugService", () => {
       expect(requestBody).toEqual(errorRequest);
     });
 
-    it("should send error request without context", () => {
+    it("should send error request without context", async () => {
       const errorRequest = {
         time: 1234567890,
         message: "Test error",
@@ -153,13 +162,14 @@ describe("DuckBugService", () => {
       };
 
       service.sendError(errorRequest);
+      await service.flush();
 
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = JSON.parse(callArgs[1]?.body as string);
       expect(requestBody).toEqual(errorRequest);
     });
 
-    it("should send error request with all fields", () => {
+    it("should send error request with all fields", async () => {
       const errorRequest = {
         time: 1234567890,
         message: "Test error",
@@ -173,6 +183,7 @@ describe("DuckBugService", () => {
       };
 
       service.sendError(errorRequest);
+      await service.flush();
 
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = JSON.parse(callArgs[1]?.body as string);
@@ -183,9 +194,10 @@ describe("DuckBugService", () => {
       expect(requestBody.context).toEqual({ key: "value" });
     });
 
-    it("should use the correct DSN from config for errors", () => {
+    it("should use the correct DSN from config for errors", async () => {
+      const customDsn = "https://error-api.example.com/ingest/proj:key";
       const customConfig: DuckBugConfig = {
-        dsn: "https://error-api.example.com",
+        dsn: customDsn,
       };
       const customService = new DuckBugService(customConfig);
 
@@ -198,15 +210,18 @@ describe("DuckBugService", () => {
       };
 
       customService.sendError(errorRequest);
+      await customService.flush();
 
       const callArgs = mockFetch.mock.calls[0];
-      expect(callArgs[0]).toBe(`${customConfig.dsn}/errors`);
+      expect(callArgs[0]).toBe(
+        "https://error-api.example.com/ingest/proj:key/errors",
+      );
       expect(callArgs[1]?.method).toBe("POST");
     });
   });
 
   describe("integration", () => {
-    it("should handle multiple consecutive calls", () => {
+    it("should handle multiple consecutive calls", async () => {
       const logInfo: Log = {
         message: "First log",
         level: logLevel.INFO,
@@ -214,7 +229,7 @@ describe("DuckBugService", () => {
         context: { message: "First context" },
       };
 
-      const errorInfo: ErrorRequest = {
+      const errorInfo = {
         time: Date.now(),
         message: "First error",
         stacktrace: { raw: "Error stack", frames: [] },
@@ -226,12 +241,13 @@ describe("DuckBugService", () => {
       service.sendLog(logInfo);
       service.sendError(errorInfo);
       service.sendLog({ ...logInfo, message: "Second log" });
+      await service.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(3);
       const calls = mockFetch.mock.calls;
-      expect(calls[0][0]).toBe(`${config.dsn}/logs`);
-      expect(calls[1][0]).toBe(`${config.dsn}/errors`);
-      expect(calls[2][0]).toBe(`${config.dsn}/logs`);
+      expect(calls[0][0]).toBe(logsUrl);
+      expect(calls[1][0]).toBe(errorsUrl);
+      expect(calls[2][0]).toBe(logsUrl);
     });
   });
 });

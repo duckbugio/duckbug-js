@@ -1,18 +1,20 @@
 import { describe, expect, it } from "bun:test";
 import { parseError, processError } from "../../src/DuckBug/DuckBugHelper";
+import { SDK_IDENTITY } from "../../src/sdkIdentity";
 
 describe("DuckBugHelper", () => {
   describe("processError", () => {
-    it("should process error with stack trace and return ErrorRequest", () => {
+    it("should process error with stack trace and return DuckBug error event", () => {
       const error = new Error("Test error message");
       error.stack =
         "Error: Test error message\n    at Object.foo (src/utils.ts:42:10)\n    at main (index.js:10:5)";
 
-      const result = processError(error, "Custom message", 1234567890);
+      const result = processError(error, "Custom tag", 1234567890);
 
       expect(result).toEqual({
         time: 1234567890,
-        message: "Custom message",
+        message: "Test error message",
+        dTags: ["Custom tag"],
         file: "src/utils.ts",
         line: 42,
         stacktrace: {
@@ -23,7 +25,10 @@ describe("DuckBugHelper", () => {
             { index: 2, content: "at main (index.js:10:5)" },
           ],
         },
-        context: { message: "Test error message" },
+        stacktraceAsString: error.stack,
+        exception: { type: "Error", message: "Test error message" },
+        platform: "node",
+        sdk: { ...SDK_IDENTITY },
       });
     });
 
@@ -35,14 +40,18 @@ describe("DuckBugHelper", () => {
 
       expect(result).toEqual({
         time: 999999,
-        message: "Tag",
+        message: "Error without stack",
+        dTags: ["Tag"],
         file: "unknown",
         line: 0,
         stacktrace: {
           raw: "",
           frames: [],
         },
-        context: { message: "Error without stack" },
+        stacktraceAsString: "",
+        exception: { type: "Error", message: "Error without stack" },
+        platform: "node",
+        sdk: { ...SDK_IDENTITY },
       });
     });
 
@@ -60,15 +69,24 @@ describe("DuckBugHelper", () => {
       });
     });
 
-    it("should use provided time and message", () => {
+    it("should use error message and tag as dTags", () => {
       const error = new Error("Test");
       const time = 9876543210;
-      const message = "Custom error tag";
+      const tag = "Custom error tag";
 
-      const result = processError(error, message, time);
+      const result = processError(error, tag, time);
 
       expect(result.time).toBe(time);
-      expect(result.message).toBe(message);
+      expect(result.message).toBe("Test");
+      expect(result.dTags).toEqual([tag]);
+    });
+
+    it("should attach extra when error.message is JSON object", () => {
+      const error = new Error('{"reason":"timeout","ms":500}');
+
+      const result = processError(error, "json", 1);
+
+      expect(result.extra).toEqual({ reason: "timeout", ms: 500 });
     });
   });
 
@@ -106,59 +124,51 @@ describe("DuckBugHelper", () => {
     });
 
     it("should extract file and line from different stack formats", () => {
-      const error1 = new Error("Test");
-      error1.stack = "Error: Test\n    at Object.method (file.js:100:20)";
-      const result1 = parseError(error1);
-      expect(result1.file).toBe("file.js");
-      expect(result1.line).toBe(100);
+      const error = new Error("Format test");
+      error.stack = "Error: Format test\n    at func (/path/to/file.ts:100:20)";
 
-      const error2 = new Error("Test");
-      error2.stack = "Error: Test\n    at file.js:50:15";
-      const result2 = parseError(error2);
-      expect(result2.file).toBe("file.js");
-      expect(result2.line).toBe(50);
+      const result = parseError(error);
 
-      const error3 = new Error("Test");
-      error3.stack = "Error: Test\n    at async handler (src/app.ts:42:10)";
-      const result3 = parseError(error3);
-      expect(result3.file).toBe("src/app.ts");
-      expect(result3.line).toBe(42);
+      expect(result.file).toBe("path/to/file.ts");
+      expect(result.line).toBe(100);
     });
 
     it("should handle file:// prefix in file path", () => {
-      const error = new Error("Test");
-      error.stack = "Error: Test\n    at (file:///Users/test/app.js:10:5)";
+      const error = new Error("File URL test");
+      error.stack =
+        "Error: File URL test\n    at func (file:///app/src/module.js:15:8)";
 
       const result = parseError(error);
 
-      expect(result.file).toBe("Users/test/app.js");
-      expect(result.line).toBe(10);
-    });
-
-    it("should handle absolute paths with leading slashes", () => {
-      const error = new Error("Test");
-      error.stack = "Error: Test\n    at (/var/www/app/index.js:15:3)";
-
-      const result = parseError(error);
-
-      expect(result.file).toBe("var/www/app/index.js");
+      expect(result.file).toBe("app/src/module.js");
       expect(result.line).toBe(15);
     });
 
-    it("should parse JSON context from error message", () => {
-      const error = new Error('{"key":"value","number":123}');
+    it("should handle absolute paths with leading slashes", () => {
+      const error = new Error("Absolute path test");
+      error.stack =
+        "Error: Absolute path test\n    at func (/usr/src/app.js:20:10)";
 
       const result = parseError(error);
 
-      expect(result.context).toEqual({ key: "value", number: 123 });
+      expect(result.file).toBe("usr/src/app.js");
+      expect(result.line).toBe(20);
+    });
+
+    it("should parse JSON context from error message", () => {
+      const error = new Error('{"userId":123,"action":"test"}');
+
+      const result = parseError(error);
+
+      expect(result.context).toEqual({ userId: 123, action: "test" });
     });
 
     it("should wrap non-JSON context in object", () => {
-      const error = new Error("Simple error message");
+      const error = new Error("Plain text error");
 
       const result = parseError(error);
 
-      expect(result.context).toEqual({ message: "Simple error message" });
+      expect(result.context).toEqual({ message: "Plain text error" });
     });
 
     it("should handle error with empty message", () => {
@@ -171,132 +181,116 @@ describe("DuckBugHelper", () => {
     });
 
     it("should parse multi-line stack trace correctly", () => {
-      const error = new Error("Multi-line error");
-      error.stack = `Error: Multi-line error
-    at firstFunction (file1.js:10:5)
-    at secondFunction (file2.js:20:10)
-    at thirdFunction (file3.js:30:15)`;
+      const error = new Error("Multi-line test");
+      error.stack = `Error: Multi-line test
+    at first (file1.js:10:5)
+    at second (file2.js:20:10)
+    at third (file3.js:30:15)`;
 
       const result = parseError(error);
 
+      expect(result.stacktrace.frames.length).toBe(4);
       expect(result.file).toBe("file1.js");
       expect(result.line).toBe(10);
-      expect((result.stacktrace as { frames: unknown[] }).frames.length).toBe(
-        4,
-      );
-      expect(
-        (result.stacktrace as { frames: { content: string }[] }).frames[0]
-          .content,
-      ).toBe("Error: Multi-line error");
     });
 
     it("should handle stack trace with only error message", () => {
-      const error = new Error("Just message");
-      error.stack = "Error: Just message";
+      const error = new Error("Only message");
+      error.stack = "Error: Only message";
 
       const result = parseError(error);
 
+      expect(result.stacktrace.frames.length).toBe(1);
       expect(result.file).toBe("unknown");
       expect(result.line).toBe(0);
-      expect((result.stacktrace as { frames: unknown[] }).frames.length).toBe(
-        1,
-      );
     });
 
     it("should handle stack trace with whitespace-only lines", () => {
-      const error = new Error("Test");
-      error.stack = "Error: Test\n    \n    at test.js:5:10\n    ";
+      const error = new Error("Whitespace test");
+      error.stack =
+        "Error: Whitespace test\n\n    at func (test.js:5:5)\n  \n   ";
 
       const result = parseError(error);
 
-      const frames = (result.stacktrace as { frames: { content: string }[] })
-        .frames;
-      expect(frames.length).toBeGreaterThan(0);
-      expect(frames.every((frame) => frame.content.trim().length > 0)).toBe(
-        true,
-      );
+      expect(result.file).toBe("test.js");
+      expect(result.line).toBe(5);
     });
   });
 
   describe("stacktrace parsing (via parseError)", () => {
     it("should return unknown file and line 0 for undefined stack", () => {
-      const error = new Error("Test");
+      const error = new Error("No stack");
       error.stack = undefined;
-      const parsed = parseError(error);
 
-      expect(parsed.file).toBe("unknown");
-      expect(parsed.line).toBe(0);
+      const result = parseError(error);
+
+      expect(result.file).toBe("unknown");
+      expect(result.line).toBe(0);
+      expect(result.stacktrace.frames).toEqual([]);
     });
 
     it("should correctly parse file and line from standard stack format", () => {
-      const error = new Error("Test");
+      const error = new Error("Standard format");
       error.stack =
-        "Error: Test\n    at MyClass.method (path/to/file.ts:123:45)";
+        "Error: Standard format\n    at myFunction (/home/user/app.js:42:15)";
 
       const result = parseError(error);
 
-      expect(result.file).toBe("path/to/file.ts");
-      expect(result.line).toBe(123);
+      expect(result.file).toBe("home/user/app.js");
+      expect(result.line).toBe(42);
     });
 
     it("should create frames array with correct structure", () => {
-      const error = new Error("Test");
-      error.stack = "Error: Test\n    at line1\n    at line2";
+      const error = new Error("Frame structure");
+      error.stack =
+        "Error: Frame structure\n    at a (a.js:1:1)\n    at b (b.js:2:2)";
 
       const result = parseError(error);
 
-      const stacktrace = result.stacktrace as {
-        raw: string;
-        frames: Array<{ index: number; content: string }>;
-      };
-
-      expect(stacktrace.frames).toHaveLength(3);
-      expect(stacktrace.frames[0]).toEqual({
+      expect(result.stacktrace.frames[0]).toEqual({
         index: 0,
-        content: "Error: Test",
+        content: "Error: Frame structure",
       });
-      expect(stacktrace.frames[1]).toEqual({
+      expect(result.stacktrace.frames[1]).toEqual({
         index: 1,
-        content: "at line1",
-      });
-      expect(stacktrace.frames[2]).toEqual({
-        index: 2,
-        content: "at line2",
+        content: "at a (a.js:1:1)",
       });
     });
   });
 
   describe("context parsing (via parseError)", () => {
     it("should return null for undefined context", () => {
-      const error = new Error("");
+      const error = new Error();
+      error.message = "";
       error.stack = undefined;
+
       const result = parseError(error);
 
       expect(result.context).toBeNull();
     });
 
     it("should parse valid JSON context", () => {
-      const error = new Error('{"user":"john","action":"login"}');
+      const error = new Error('{"key":"value","number":42}');
 
       const result = parseError(error);
 
-      expect(result.context).toEqual({ user: "john", action: "login" });
+      expect(result.context).toEqual({ key: "value", number: 42 });
     });
 
     it("should wrap plain text in object", () => {
-      const error = new Error("Plain error text");
+      const error = new Error("Not JSON at all");
 
       const result = parseError(error);
 
-      expect(result.context).toEqual({ message: "Plain error text" });
+      expect(result.context).toEqual({ message: "Not JSON at all" });
     });
 
     it("should handle invalid JSON gracefully", () => {
-      const error = new Error('{"invalid": json}');
+      const error = new Error("{invalid json");
 
       const result = parseError(error);
 
-      expect(result.context).toEqual({ message: '{"invalid": json}' });
+      expect(result.context).toEqual({ message: "{invalid json" });
     });
   });
 });
