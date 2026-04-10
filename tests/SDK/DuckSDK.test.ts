@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from "bun:test";
+import { beforeEach, describe, expect, it, mock, spyOn } from "bun:test";
 import type { LogProviderConfig, Provider } from "../../src/SDK";
 import { Duck, DuckSDK } from "../../src/SDK/DuckSDK";
 import { logLevel } from "../../src/SDK/LogLevel";
@@ -244,6 +244,127 @@ describe("DuckSDK", () => {
         expect.objectContaining({
           message: tag,
           level: logLevel.FATAL,
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+  });
+
+  describe("_duck log payload", () => {
+    beforeEach(() => {
+      sdk = new DuckSDK(providers);
+    });
+
+    it("maps dTags to top level and domain fields to context (ingest curl shape)", () => {
+      const spy = spyOn(Date, "now").mockReturnValue(1_704_067_200_000);
+
+      sdk.warn("DUCKBUG_DTAGS_SMOKE_TEST", {
+        source: "initDuckBugDeviceContext",
+        platform: "ios",
+        _duck: { dTags: ["smoke-test", "dtags"] },
+      });
+
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          time: 1_704_067_200_000,
+          level: logLevel.WARN,
+          message: "DUCKBUG_DTAGS_SMOKE_TEST",
+          dTags: ["smoke-test", "dtags"],
+          context: {
+            source: "initDuckBugDeviceContext",
+            platform: "ios",
+          },
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+      const body = (mockProvider1.sendLog as ReturnType<typeof mock>).mock
+        .calls[0][0] as { context?: Record<string, unknown> };
+      expect(body.context?._duck).toBeUndefined();
+      spy.mockRestore();
+    });
+
+    it("uses _duck.scope.context when payload has no other keys", () => {
+      sdk.warn("ONLY_SCOPE_CTX", {
+        _duck: {
+          scope: {
+            context: { a: 1 },
+            release: "1.0.0",
+          },
+        },
+      });
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "ONLY_SCOPE_CTX",
+          context: { a: 1 },
+          release: "1.0.0",
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+
+    it("prefers root payload over _duck.scope.context for context", () => {
+      sdk.warn("ROOT_WINS", {
+        b: 2,
+        _duck: {
+          scope: {
+            context: { a: 1 },
+          },
+        },
+      });
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          context: { b: 2 },
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+
+    it("applies _duck.scope.platform over default node", () => {
+      sdk.warn("PLATFORM", {
+        _duck: { scope: { platform: "ios" } },
+      });
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          platform: "ios",
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+
+    it("uses dTags from _duck.scope when _duck.dTags omitted", () => {
+      sdk.warn("TAG", {
+        _duck: { scope: { dTags: ["from-scope"] } },
+      });
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dTags: ["from-scope"],
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+
+    it("_duck.dTags overrides scope.dTags", () => {
+      sdk.warn("TAG", {
+        _duck: {
+          dTags: ["reserved"],
+          scope: { dTags: ["ignored"] },
+        },
+      });
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          dTags: ["reserved"],
+        }),
+        SDK_SKIP_PIPELINE,
+      );
+    });
+
+    it("treats null payload as context null (typeof null is object)", () => {
+      // @ts-expect-error intentional loose call
+      sdk.log("NULL_CTX", null);
+      expect(mockProvider1.sendLog).toHaveBeenCalledWith(
+        expect.objectContaining({
+          message: "NULL_CTX",
+          context: null,
         }),
         SDK_SKIP_PIPELINE,
       );
