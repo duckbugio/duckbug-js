@@ -1,7 +1,6 @@
 import type {
   DuckBugErrorEvent,
   DuckBugLogEvent,
-  IngestJsonValue,
   IngestSharedMetadata,
 } from "../contract";
 import type {
@@ -12,6 +11,7 @@ import { processError } from "../DuckBug/DuckBugHelper";
 import { finalizeIngestEvent } from "../DuckBug/finalizeIngestEvent";
 import type { StrippableIngestSection } from "../DuckBug/stripIngestSections";
 import { SDK_IDENTITY } from "../sdkIdentity";
+import { type DuckLogPayload, parseDuckLogPayload } from "./duckLogPayload";
 import type { LogLevel } from "./LogLevel";
 import { logLevel } from "./LogLevel";
 import { LogProvider } from "./LogProvider";
@@ -72,23 +72,23 @@ export class DuckSDK {
     ).then(() => undefined);
   }
 
-  log(tag: string, payload?: object) {
+  log(tag: string, payload?: DuckLogPayload) {
     this.emitLog(logLevel.DEBUG, tag, payload);
   }
 
-  error(tag: string, payload?: object) {
+  error(tag: string, payload?: DuckLogPayload) {
     this.emitLog(logLevel.ERROR, tag, payload);
   }
 
-  debug(tag: string, payload?: object) {
+  debug(tag: string, payload?: DuckLogPayload) {
     this.emitLog(logLevel.DEBUG, tag, payload);
   }
 
-  warn(tag: string, payload?: object) {
+  warn(tag: string, payload?: DuckLogPayload) {
     this.emitLog(logLevel.WARN, tag, payload);
   }
 
-  fatal(tag: string, payload?: object) {
+  fatal(tag: string, payload?: DuckLogPayload) {
     this.emitLog(logLevel.FATAL, tag, payload);
   }
 
@@ -155,15 +155,26 @@ export class DuckSDK {
     return out as DuckBugErrorEvent;
   }
 
-  private emitLog(level: LogLevel, message: string, payload?: object) {
+  private emitLog(level: LogLevel, message: string, payload?: DuckLogPayload) {
+    const { scopePatch, context, dTags } = parseDuckLogPayload(payload);
+    const platform =
+      scopePatch.platform !== undefined &&
+      typeof scopePatch.platform === "string"
+        ? scopePatch.platform
+        : "node";
+    const scopeForSpread = { ...scopePatch } as Record<string, unknown>;
+    delete scopeForSpread.platform;
+
     const event: DuckBugLogEvent = this.mergeScope({
+      ...scopeForSpread,
       time: Date.now(),
       level,
       message,
-      platform: "node",
+      platform,
       sdk: { ...SDK_IDENTITY },
-      ...(payload !== undefined ? { context: payload as IngestJsonValue } : {}),
-    });
+      ...(dTags !== undefined ? { dTags } : {}),
+      ...(context !== undefined ? { context } : {}),
+    } as DuckBugLogEvent);
     const finalized = finalizeIngestEvent(event, {
       extraSensitiveKeys: this.extraSensitiveKeys,
       stripSections: this.stripSections,

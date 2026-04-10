@@ -63,6 +63,23 @@ duck.warn('Slow query', { ms: 1200 });
 
 Before process exit, await `duck.flush()` so queued HTTP work finishes (for example at the end of an `async main()`).
 
+### Reserved `_duck` on log payloads
+
+The second argument to `log` / `debug` / `warn` / `error` / `fatal` may be a plain object with a reserved **`_duck`** field for technical metadata. **`_duck` is not sent inside `context`** on the wire.
+
+- **`_duck.dTags`** — sets top-level `dTags` on the ingest event (same as in a raw JSON body).
+- **`_duck.scope`** — one-shot `Partial<IngestSharedMetadata>` merged into **this** log only (after global `setScope`, before fixed fields). Use e.g. `platform: "ios"` to override the default `"node"`. Optional **`_duck.scope.context`** is used as the event `context` only when there are no other keys besides `_duck`.
+
+Any other keys on the object become **`context`**, which matches typical ingest JSON (`dTags` at the root, domain fields under `context`).
+
+```typescript
+duck.warn("DUCKBUG_DTAGS_SMOKE_TEST", {
+  source: "initDuckBugDeviceContext",
+  platform: "ios",
+  _duck: { dTags: ["smoke-test", "dtags"] },
+});
+```
+
 ## Full usage example
 
 End-to-end pattern for a Node/Bun service: DSN from env, scope (release, user, fingerprint), privacy pipeline, `beforeSend`, batched transport with retries, transport errors, console forwarding, global error handlers, structured logs, manual errors, and clean shutdown.
