@@ -262,6 +262,8 @@ DuckBugProvider.fromDSN(dsn)
 
 - `config.dsn`: full ingest URL, e.g. `https://api.duckbug.io/ingest/myProject:myKey`
 - `flush()`: returns a `Promise` that resolves when queued requests for this provider have been sent
+- Delivery is retried on a request that never produced a response, `408`, `429` and every `5xx`, including status codes this SDK has never been taught about - those are what an edge in front of the installation invents, and dropping the event on the first one would lose it silently. `501 Not Implemented` is the single exception and is final, because it means the capability is not configured in that DuckBug installation and repeating the request cannot change that. Everything else, `4xx` in particular, is reported to `onTransportError` after one attempt. The same predicate is implemented in `duckbug-go` and `duckbug-php`.
+- `TransportFailureInfo.attempts` is how many requests were actually made, not the configured budget.
 
 ### Privacy, batching, and Node hooks
 
