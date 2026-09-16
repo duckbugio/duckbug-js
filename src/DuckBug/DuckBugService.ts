@@ -39,9 +39,18 @@ const STATUS_NOT_IMPLEMENTED = 501;
  * taught about into a silently dropped event, which is the one failure an error
  * tracker must not have, and widening it means shipping a new SDK into every
  * consumer's dependency tree. Being wrong the other way costs at most
- * `maxRetries` extra requests with bounded backoff, and the backend treats
- * `eventId` as the idempotency key, so a retry of a request that did arrive
- * cannot create a second event.
+ * `maxRetries` extra requests with bounded backoff, and a retry of a request
+ * that did arrive cannot create a second event: ingest deduplicates on the
+ * event id with a Postgres primary key and ON CONFLICT DO NOTHING, with no
+ * expiry, on the single and the batch route alike.
+ *
+ * That guarantee is only as strong as the id. It has to be supplied by the
+ * caller: when a payload reaches ingest without an `eventId`, the server mints
+ * a fresh one per request and a retry does store the event twice.
+ * `finalizeIngestEvent` runs `ensureEventId` on everything `DuckBugProvider`
+ * sends, so the normal path is safe; code driving `DuckBugService` directly
+ * owns that field itself. The server validates it as uuid4, so a non-UUID
+ * idempotency key is rejected with 400 rather than honoured.
  *
  * 408 is retried because it is the edge timing out the request body (nginx
  * client_body_timeout and friends), never a verdict on the payload; RFC 9110
