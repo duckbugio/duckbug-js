@@ -1,5 +1,6 @@
 import type { DuckBugErrorEvent, DuckBugLogEvent } from "../contract";
 import type { DuckBugConfig } from "./DuckBugConfig";
+import { ensureEventId } from "./ensureEventId";
 import {
   ingestErrorsBatchUrl,
   ingestErrorsUrl,
@@ -44,13 +45,14 @@ const STATUS_NOT_IMPLEMENTED = 501;
  * event id with a Postgres primary key and ON CONFLICT DO NOTHING, with no
  * expiry, on the single and the batch route alike.
  *
- * That guarantee is only as strong as the id. It has to be supplied by the
- * caller: when a payload reaches ingest without an `eventId`, the server mints
- * a fresh one per request and a retry does store the event twice.
- * `finalizeIngestEvent` runs `ensureEventId` on everything `DuckBugProvider`
- * sends, so the normal path is safe; code driving `DuckBugService` directly
- * owns that field itself. The server validates it as uuid4, so a non-UUID
- * idempotency key is rejected with 400 rather than honoured.
+ * That guarantee is only as strong as the id, and the id is optional to
+ * ingest: a payload that arrives without an `eventId` gets a fresh one minted
+ * per request, and a retry then stores the event twice. Nothing leaves this
+ * class in that state - `sendLog` and `sendError` run `ensureEventId` on every
+ * event they queue, which is what makes the guarantee hold for code driving
+ * `DuckBugService` directly as well as for the `DuckBugProvider` path. The
+ * server validates it as uuid4, so a non-UUID idempotency key is rejected with
+ * 400 rather than honoured.
  *
  * 408 is retried because it is the edge timing out the request body (nginx
  * client_body_timeout and friends), never a verdict on the payload; RFC 9110
@@ -128,16 +130,30 @@ export class DuckBugService {
     this.onTransportError = config.onTransportError;
   }
 
+  /**
+   * The id is assigned here, on the way into the queue, because this is the
+   * one point every event passes through before a request is built: ingest
+   * deduplicates retries on `eventId` and mints a throwaway one per request
+   * when the field is missing, so an event queued without it is stored once
+   * per attempt of `postJsonWithRetry`. `finalizeIngestEvent` covers the
+   * `DuckBugProvider` pipeline, but not a caller holding a service directly,
+   * not `sendLog(event, { skipPrivacyPipeline: true })`, and not a
+   * `beforeSend` hook that returned an event with the field dropped.
+   * `ensureEventId` keeps an id the caller supplied.
+   */
   sendLog(logInfo: DuckBugLogEvent): void {
+    const event = ensureEventId(logInfo);
     void this.enqueueLogTransport(async () => {
-      this.logQueue.push(logInfo);
+      this.logQueue.push(event);
       await this.pumpLogsAfterEnqueue();
     });
   }
 
+  /** See {@link DuckBugService.sendLog} for why the id is assigned here. */
   sendError(errorRequest: DuckBugErrorEvent): void {
+    const event = ensureEventId(errorRequest);
     void this.enqueueErrorTransport(async () => {
-      this.errorQueue.push(errorRequest);
+      this.errorQueue.push(event);
       await this.pumpErrorsAfterEnqueue();
     });
   }
