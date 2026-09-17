@@ -16,15 +16,80 @@ const DEFAULT_MAX_RETRIES = 2;
 const DEFAULT_RETRY_DELAY_MS = 200;
 const MAX_BACKEND_BATCH = 1000;
 
+const STATUS_REQUEST_TIMEOUT = 408;
+const STATUS_TOO_MANY_REQUESTS = 429;
+const STATUS_SERVER_ERROR_MIN = 500;
+const STATUS_NOT_IMPLEMENTED = 501;
+
+/**
+ * Tells whether sending the very same request again can plausibly end
+ * differently. This predicate is the shared one: duckbug-go and duckbug-php
+ * answer exactly the same question the same way, and a change here has to land
+ * in all three.
+ *
+ * The rule is "transient unless proven final": 408, 429 and every 5xx are worth
+ * another attempt; 501 is the single carve-out; everything else is the final
+ * answer. A request that never produced a response is handled by the caller
+ * below, outside this function.
+ *
+ * It is written as a rule with one hole rather than as a list of retriable
+ * codes on purpose. This SDK does not only talk to DuckBug's ingest - a DuckBug
+ * installation sits behind whatever edge the customer runs, and that edge
+ * invents statuses of its own. An allow list turns every code it has not been
+ * taught about into a silently dropped event, which is the one failure an error
+ * tracker must not have, and widening it means shipping a new SDK into every
+ * consumer's dependency tree. Being wrong the other way costs at most
+ * `maxRetries` extra requests with bounded backoff, and a retry of a request
+ * that did arrive cannot create a second event: ingest deduplicates on the
+ * event id with a Postgres primary key and ON CONFLICT DO NOTHING, with no
+ * expiry, on the single and the batch route alike.
+ *
+ * That guarantee is only as strong as the id. It has to be supplied by the
+ * caller: when a payload reaches ingest without an `eventId`, the server mints
+ * a fresh one per request and a retry does store the event twice.
+ * `finalizeIngestEvent` runs `ensureEventId` on everything `DuckBugProvider`
+ * sends, so the normal path is safe; code driving `DuckBugService` directly
+ * owns that field itself. The server validates it as uuid4, so a non-UUID
+ * idempotency key is rejected with 400 rather than honoured.
+ *
+ * 408 is retried because it is the edge timing out the request body (nginx
+ * client_body_timeout and friends), never a verdict on the payload; RFC 9110
+ * states outright that such a request may be repeated unchanged.
+ *
+ * 501 is the hole: it is DuckBug stating that the capability is not configured
+ * in this installation, and only an operator can change that. The backend
+ * reaches for 501 over 503 in exactly that case so clients stop retrying,
+ * because 503 would promise that waiting helps. A 501 from an intermediary
+ * means the same thing one layer out, so the answer is the same either way.
+ *
+ * Do not widen this carve-out to 503. On the ingest path a 503 is the edge
+ * during a redeploy - the transient case this predicate exists for.
+ *
+ * Deliberate differences from the other two SDKs:
+ *   - a request that never reached a response is a rejected `fetch` promise
+ *     with no status at all, so it cannot be expressed here; the loop below
+ *     retries it in its `catch`. duckbug-go sees the same case as an error from
+ *     `http.Client.Do` and duckbug-php as a cURL errno.
+ *   - 409 never reaches this function: `ingestResponseAccepted` folds it into
+ *     success, because a duplicate `eventId` means the event is already stored.
+ *     duckbug-go and duckbug-php surface 409 to the caller instead, and reach
+ *     the same retry answer - no retry - by a different route.
+ *
+ * The 429 that DuckBug's rate limiter returns carries `Retry-After`, which this
+ * transport does not read - the backoff below decides on its own. Honouring it
+ * is a separate change and has to land in all three SDKs together.
+ */
 function isRetriableHttpStatus(status: number): boolean {
-  return (
-    status === 408 ||
-    status === 429 ||
-    status === 500 ||
-    status === 502 ||
-    status === 503 ||
-    status === 504
-  );
+  if (status === STATUS_NOT_IMPLEMENTED) {
+    return false;
+  }
+  if (
+    status === STATUS_REQUEST_TIMEOUT ||
+    status === STATUS_TOO_MANY_REQUESTS
+  ) {
+    return true;
+  }
+  return status >= STATUS_SERVER_ERROR_MIN;
 }
 
 function ingestResponseAccepted(status: number): boolean {
@@ -223,8 +288,14 @@ export class DuckBugService {
   ): Promise<void> {
     let lastErr: unknown = new Error("unknown transport failure");
     const maxAttempts = this.maxRetries + 1;
+    // What the caller is told in `TransportFailureInfo.attempts` has to be what
+    // actually happened, not the budget: a terminal status stops the loop after
+    // one request, and reporting `maxAttempts` there would invent two retries
+    // that never ran. duckbug-go and duckbug-php both report the real count.
+    let attemptsMade = 0;
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
+      attemptsMade = attempt + 1;
       try {
         const res = await this.fetchImpl(url, {
           method: "POST",
@@ -273,7 +344,7 @@ export class DuckBugService {
     this.emitFailure({
       kind,
       itemCount,
-      attempts: maxAttempts,
+      attempts: attemptsMade,
       error: lastErr,
       message,
     });
