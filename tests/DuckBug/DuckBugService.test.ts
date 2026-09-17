@@ -38,12 +38,17 @@ describe("DuckBugService", () => {
       await service.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(logsUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(logInfo),
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe(logsUrl);
+      expect(callArgs[1]?.method).toBe("POST");
+      expect(callArgs[1]?.headers).toEqual({
+        "Content-Type": "application/json",
+      });
+      // The body is the caller's event plus the eventId the service mints for
+      // retry idempotency; the id itself is covered by the "eventId" tests.
+      expect(JSON.parse(callArgs[1]?.body as string)).toEqual({
+        ...JSON.parse(JSON.stringify(logInfo)),
+        eventId: expect.any(String),
       });
     });
 
@@ -59,12 +64,17 @@ describe("DuckBugService", () => {
       await service.flush();
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
-      expect(mockFetch).toHaveBeenCalledWith(logsUrl, {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify(logInfo),
+      const callArgs = mockFetch.mock.calls[0];
+      expect(callArgs[0]).toBe(logsUrl);
+      expect(callArgs[1]?.method).toBe("POST");
+      expect(callArgs[1]?.headers).toEqual({
+        "Content-Type": "application/json",
+      });
+      // The body is the caller's event plus the eventId the service mints for
+      // retry idempotency; the id itself is covered by the "eventId" tests.
+      expect(JSON.parse(callArgs[1]?.body as string)).toEqual({
+        ...JSON.parse(JSON.stringify(logInfo)),
+        eventId: expect.any(String),
       });
     });
 
@@ -146,7 +156,10 @@ describe("DuckBugService", () => {
       });
 
       const requestBody = JSON.parse(callArgs[1]?.body as string);
-      expect(requestBody).toEqual(errorRequest);
+      expect(requestBody).toEqual({
+        ...errorRequest,
+        eventId: expect.any(String),
+      });
     });
 
     it("should send error request without context", async () => {
@@ -166,7 +179,10 @@ describe("DuckBugService", () => {
 
       const callArgs = mockFetch.mock.calls[0];
       const requestBody = JSON.parse(callArgs[1]?.body as string);
-      expect(requestBody).toEqual(errorRequest);
+      expect(requestBody).toEqual({
+        ...errorRequest,
+        eventId: expect.any(String),
+      });
     });
 
     it("should send error request with all fields", async () => {
@@ -217,6 +233,81 @@ describe("DuckBugService", () => {
         "https://error-api.example.com/ingest/proj:key/errors",
       );
       expect(callArgs[1]?.method).toBe("POST");
+    });
+  });
+
+  describe("eventId", () => {
+    // The shape ingest validates the field against (`omitempty,uuid4`): an id
+    // in any other shape is answered with 400, not deduplicated.
+    const UUID4 =
+      /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
+
+    const bodyOf = (call: unknown[]): Record<string, unknown> =>
+      JSON.parse((call[1] as RequestInit).body as string);
+
+    it("mints a uuid4 eventId for a log sent without one", async () => {
+      service.sendLog({
+        message: "no id from the caller",
+        level: logLevel.INFO,
+        time: 1234567890,
+      });
+      await service.flush();
+
+      expect(bodyOf(mockFetch.mock.calls[0]).eventId).toMatch(UUID4);
+    });
+
+    it("mints a uuid4 eventId for an error sent without one", async () => {
+      service.sendError({
+        time: 1234567890,
+        message: "no id from the caller",
+        stacktrace: { raw: "", frames: [] },
+        file: "test.js",
+        line: 1,
+      });
+      await service.flush();
+
+      expect(bodyOf(mockFetch.mock.calls[0]).eventId).toMatch(UUID4);
+    });
+
+    it("keeps an eventId the caller supplied", async () => {
+      const callerId = "550e8400-e29b-41d4-a716-446655440000";
+
+      service.sendLog({
+        eventId: callerId,
+        message: "caller owns the id",
+        level: logLevel.INFO,
+        time: 1234567890,
+      });
+      await service.flush();
+
+      expect(bodyOf(mockFetch.mock.calls[0]).eventId).toBe(callerId);
+    });
+
+    it("mints a distinct eventId per batched event", async () => {
+      const batching = new DuckBugService({
+        dsn: TEST_DSN,
+        transport: { maxBatchSize: 2 },
+      });
+
+      batching.sendLog({
+        message: "first",
+        level: logLevel.INFO,
+        time: 1,
+      });
+      batching.sendLog({
+        message: "second",
+        level: logLevel.INFO,
+        time: 2,
+      });
+      await batching.flush();
+
+      const batch = JSON.parse(
+        (mockFetch.mock.calls[0][1] as RequestInit).body as string,
+      ) as Array<Record<string, unknown>>;
+      expect(batch).toHaveLength(2);
+      expect(batch[0].eventId).toMatch(UUID4);
+      expect(batch[1].eventId).toMatch(UUID4);
+      expect(batch[0].eventId).not.toBe(batch[1].eventId);
     });
   });
 
